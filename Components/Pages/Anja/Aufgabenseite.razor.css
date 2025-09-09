@@ -1,0 +1,170 @@
+﻿/* Datei: Components/Pages/Anja/Aufgabenseite.razor.css */
+/* Seite: Aufgabenseite */
+
+/* --- Layout / Toolbar --- */
+.aufgaben-toolbar {
+    display: flex;
+    gap: .75rem;
+    align-items: center;
+    margin-bottom: .75rem;
+}
+
+    .aufgaben-toolbar .meta {
+        margin-left: auto;
+        font-size: .875rem;
+        color: #6c757d;
+    }
+
+/* --- Tabellen --- */
+.table-container {
+    border: 1px solid #e9ecef;
+    border-radius: .5rem;
+    overflow: hidden;
+    background: #fff;
+}
+
+    .table-container .table {
+        margin: 0;
+    }
+
+.table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #ffffff;
+    box-shadow: inset 0 -1px 0 #eef1f4;
+}
+
+.table-sm tr > * {
+    padding: .45rem .6rem;
+    vertical-align: middle;
+}
+
+/* Zeilenfärbung je nach Fälligkeit (vom Code gesetzt: row--overdue / row--soon) */
+.row--overdue {
+    background-color: #ffeaea !important;
+}
+
+.row--soon {
+    background-color: #fff7d6 !important;
+}
+
+/* Status-Badges */
+.status-badge {
+    display: inline-block;
+    padding: .15rem .55rem;
+    border-radius: 999px;
+    font-size: .8rem;
+    line-height: 1.15;
+    border: 1px solid rgba(0,0,0,.06);
+    white-space: nowrap;
+}
+
+.status-offen {
+    background: #ffffff;
+}
+
+.status-inbearbeitung {
+    background: #e7f1ff;
+}
+
+.status-erledigt {
+    background: #e6f7ea;
+}
+
+/* --- Switch Feinjustierung --- */
+.form-check.form-switch .form-check-input {
+    width: 2.5rem;
+    height: 1.25rem;
+    cursor: pointer;
+}
+
+.form-check.form-switch .form-check-label {
+    user-select: none;
+}
+
+/* --- Leere Zustände --- */
+.empty-state {
+    padding: 1rem;
+    color: #6c757d;
+}
+
+/* --- Modal Verbesserungen --- */
+.modal-backdrop.show {
+    backdrop-filter: saturate(80%) blur(2px);
+}
+
+.pa-modal .modal-dialog {
+    max-width: 860px;
+    margin: 2rem auto;
+    animation: pa-zoom .18s ease-out;
+}
+
+@keyframes pa-zoom {
+    from {
+        transform: translateY(6px) scale(.985);
+        opacity: 0;
+    }
+
+    to {
+        transform: none;
+        opacity: 1;
+    }
+}
+
+.pa-modal .modal-content {
+    border-radius: 1rem;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 20px 36px rgba(0,0,0,.12);
+}
+
+.pa-modal .modal-header {
+    border-bottom: 1px solid #eef1f4;
+}
+
+.pa-modal .modal-title {
+    font-weight: 700;
+}
+
+.pa-modal .modal-body {
+    padding: 1rem;
+}
+
+.pa-modal .form-label {
+    font-weight: 600;
+    margin-bottom: .25rem;
+}
+
+.pa-modal .form-control, .pa-modal .form-select {
+    min-height: 38px;
+}
+
+.pa-modal .btn-success {
+    box-shadow: 0 1px 0 rgba(0,0,0,.03);
+}
+
+.pa-modal .btn-outline-secondary {
+    border-color: #d0d7de;
+}
+
+/* SearchCombo innerhalb des Modals immer on-top halten */
+.pa-modal .searchcombo-dropdown {
+    z-index: 5000 !important;
+}
+
+/* --- Responsiveness --- */
+@media (max-width: 768px) {
+    .col-hide-sm {
+        display: none !important;
+    }
+
+    .table-container {
+        border-radius: .25rem;
+    }
+}
+
+/* Dezente Fokus-Styles (zugänglicher) */
+:where(.form-control, .form-select, .btn):focus {
+    outline: 2px solid transparent;
+    box-shadow: 0 0 0 .2rem rgba(13,110,253,.15);
+}

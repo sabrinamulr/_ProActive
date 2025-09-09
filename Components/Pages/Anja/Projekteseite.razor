@@ -1,0 +1,42 @@
+﻿@* @* @* Datei: Components/Pages/Anja/MeineProjekte.razor *@
+@* Seite: MeineProjekte *@
+@* 
+@page "/meine-projekte"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using ProActive2508.Models.Entity.Anja
+@using ProActive2508.Service
+@rendermode InteractiveServer
+
+<h3>Meine Projekte</h3>
+
+@if (isLoading)
+{
+    <p>Lade…</p>
+}
+else if (meineProjekte.Count == 0)
+{
+    <div class="alert alert-info">Keine Projekte gefunden, in denen du Owner oder Projektleiter bist.</div>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-4">
+            <div class="list-group">
+                @foreach (var p in meineProjekte)
+                {
+                    <a class="list-group-item list-group-item-action"
+                       href="@($"/projekt/{p.Id}")">
+                        <div class="fw-semibold">@Titel(p)</div>
+                        <small class="text-muted">@RolleFür(p)</small>
+                    </a>
+                }
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="alert alert-secondary">
+                Wähle links ein Projekt aus, um die Details zu sehen.
+            </div>
+        </div>
+    </div>
+}
+ *@ 

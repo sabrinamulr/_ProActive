@@ -1,0 +1,46 @@
+﻿@* Datei: Components/Pages/Anja/Auth/Login.razor *@
+@* Seite: Login *@
+
+@page "/auth/login"
+@using ProActive2508.Models.Anja
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+
+@if (!string.IsNullOrEmpty(LogoutInfo))
+{
+    <div class="alert alert-success" role="alert">@LogoutInfo</div>
+}
+
+@if (!string.IsNullOrEmpty(LoginError))
+{
+    <div class="alert alert-danger" role="alert">@LoginError</div>
+}
+
+<form method="post" action="/auth/login" @formname="login" class="mt-3">
+    <AntiforgeryToken />
+
+    <div class="mb-3">
+        <label for="personalnummer" class="form-label">Personalnummer</label>
+        <input id="personalnummer"
+               name="Personalnummer"
+               type="number"
+               class="form-control"
+               inputmode="numeric"
+               min="1"
+               step="1"
+               required
+               autofocus />
+    </div>
+
+    <div class="mb-3">
+        <label for="password" class="form-label">Passwort</label>
+        <input id="password"
+               name="Password"
+               type="password"
+               class="form-control"
+               autocomplete="current-password"
+               required />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Login</button>
+</form>

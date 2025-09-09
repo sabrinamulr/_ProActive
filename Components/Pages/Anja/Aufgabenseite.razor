@@ -1,0 +1,334 @@
+﻿@* Datei: Components/Pages/Anja/Aufgabenseite.razor *@
+@* Seite: Aufgabenseite *@
+
+@page "/aufgabenseite"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using ProActive2508.Models.Entity.Anja
+@using ProActive2508.Service
+@using ProActive2508.Components.Comps.SearchCbx
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+<h3 class="mb-2">Meine Aufgaben</h3>
+
+@if (!string.IsNullOrWhiteSpace(uiError))
+{
+    <div class="alert alert-warning d-flex justify-content-between align-items-start" role="alert">
+        <div><strong>Fehler:</strong> @uiError</div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ClearUiError">OK</button>
+    </div>
+}
+
+@if (isLoading)
+{
+    <p>Lade…</p>
+}
+else
+{
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <button type="button" class="btn btn-primary" @onclick="OpenCreateModal">Aufgabe anlegen</button>
+
+        <div class="form-check">
+            <input id="showDone" class="form-check-input" type="checkbox" checked="@showDone" @onchange="OnToggleShowDoneChanged" />
+            <label class="form-check-label" for="showDone">Erledigte anzeigen</label>
+        </div>
+
+        <button type="button"
+                class="btn btn-outline-secondary"
+                @onclick="ExportMeineAufgabenPdfAsync"
+                disabled="@(!MeineGefiltert.Any())">
+            PDF exportieren
+        </button>
+
+        <button type="button"
+                class="btn btn-outline-success"
+                @onclick="ExportMeineAufgabenExcelAsync"
+                disabled="@(!MeineGefiltert.Any())">
+            Excel exportieren
+        </button>
+    </div>
+
+    @* --- Filter: Meine Aufgaben --- *@
+    <div class="row g-2 align-items-end mb-2">
+        <div class="col-12 col-md-5">
+            <label class="form-label mb-1">Suche (Beschreibung oder Bearbeiter)</label>
+            <InputText class="form-control" @bind-Value="searchMeine" placeholder='z. B. "Dokumentation" oder "max@firma.at"' />
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label mb-1">Status</label>
+            <InputSelect class="form-select" @bind-Value="statusFilterMeine">
+                <option value="Alle">Alle</option>
+                <option value="Offen">Offen</option>
+                <option value="InBearbeitung">In Bearbeitung</option>
+                <option value="Erledigt">Erledigt</option>
+            </InputSelect>
+        </div>
+        <div class="col-6 col-md-4">
+            <label class="form-label mb-1">Projekt</label>
+            <InputSelect class="form-select" @bind-Value="selectedProjektMeine">
+                <option value="-1">Alle Projekte</option>
+                <option value="0">(kein Projekt)</option>
+                @foreach (var p in projektFilterListMeine)
+                {
+                    <option value="@p.Id">@p.Projektbeschreibung</option>
+                }
+            </InputSelect>
+        </div>
+    </div>
+
+    @if (!MeineGefiltert.Any())
+    {
+        <p>Keine Aufgaben gefunden.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th style="width: 70px;">Id</th>
+                        <th style="min-width: 220px;">Projekt</th>
+                        <th>Beschreibung</th>
+                        <th style="width: 140px;">Fällig</th>
+                        <th style="width: 130px;">Phase</th>
+                        <th style="width: 130px;">Status</th>
+                        <th style="width: 150px;">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in MeineGefiltert)
+                    {
+                        <tr class="@GetRowClass(a)">
+                            <td>@a.Id</td>
+                            <td>@GetProjektTextSafe(a.ProjektId)</td>
+                            <td>@a.Aufgabenbeschreibung</td>
+                            <td>@a.Faellig.ToString("dd.MM.yyyy")</td>
+                            <td>@a.Phase</td>
+                            <td><span class="badge @GetStatusClass(a.Erledigt)">@a.Erledigt</span></td>
+                            <td class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@( !CanEdit(a) )" @onclick="(() => OpenEditModal(a.Id))">Bearbeiten</button>
+                                <input class="form-check-input mt-0" type="checkbox" title="Als erledigt markieren"
+                                       checked="@(a.Erledigt == Erledigungsstatus.Erledigt)"
+                                       @onchange="(e => OnCheckboxChangedAsync(a, e?.Value is bool b && b))" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (isProjektleiter)
+    {
+        <h4 class="mt-4 mb-2">Zuweisungen von mir</h4>
+
+        <div class="row g-2 align-items-end mb-2">
+            <div class="col-12 col-md-5">
+                <label class="form-label mb-1">Suche (Beschreibung oder Bearbeiter)</label>
+                <InputText class="form-control" @bind-Value="searchZuweisungen" placeholder='z. B. "Mockups" oder "anna@firma.at"' />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label mb-1">Status</label>
+                <InputSelect class="form-select" @bind-Value="statusFilterZuweisungen">
+                    <option value="Alle">Alle</option>
+                    <option value="Offen">Offen</option>
+                    <option value="InBearbeitung">In Bearbeitung</option>
+                    <option value="Erledigt">Erledigt</option>
+                </InputSelect>
+            </div>
+            <div class="col-6 col-md-4">
+                <label class="form-label mb-1">Projekt</label>
+                <InputSelect class="form-select" @bind-Value="selectedProjektZuweisungen">
+                    <option value="-1">Alle Projekte</option>
+                    <option value="0">(kein Projekt)</option>
+                    @foreach (var p in projektFilterListZuweisungen)
+                    {
+                        <option value="@p.Id">@p.Projektbeschreibung</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+
+        @if (!ZuweisungenGefiltert.Any())
+        {
+            <p>Keine Zuweisungen vorhanden.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 70px;">Id</th>
+                            <th style="min-width: 220px;">Projekt</th>
+                            <th>Beschreibung</th>
+                            <th style="width: 140px;">Fällig</th>
+                            <th style="width: 130px;">Phase</th>
+                            <th style="width: 130px;">Status</th>
+                            <th style="width: 200px;">Bearbeiter</th>
+                            <th style="width: 120px;">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var a in ZuweisungenGefiltert)
+                        {
+                            <tr class="@GetRowClass(a)">
+                                <td>@a.Id</td>
+                                <td>@GetProjektTextSafe(a.ProjektId)</td>
+                                <td>@a.Aufgabenbeschreibung</td>
+                                <td>@a.Faellig.ToString("dd.MM.yyyy")</td>
+                                <td>@a.Phase</td>
+                                <td><span class="badge @GetStatusClass(a.Erledigt)">@a.Erledigt</span></td>
+                                <td>@(benutzerLookup.TryGetValue(a.BenutzerId, out var mail) ? mail : $"Id:{a.BenutzerId}")</td>
+                                <td class="d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="(() => OpenEditModal(a.Id))">Bearbeiten</button>
+                                    <input class="form-check-input mt-0" type="checkbox" title="Als erledigt markieren"
+                                           checked="@(a.Erledigt == Erledigungsstatus.Erledigt)"
+                                           @onchange="(e => OnCheckboxChangedAsync(a, e?.Value is bool b && b))" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+}
+
+@* ---------- Modal: Aufgabe anlegen/bearbeiten ---------- *@
+@if (isModalOpen)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1" style="--bs-modal-width: 820px;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h5 class="modal-title">@modalTitle</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+                </div>
+
+                <EditForm Model="editModel" OnValidSubmit="SaveAsync" FormName="AufgabeForm">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body">
+
+                        @if (isProjektleiter)
+                        {
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Projekt</label>
+                                    <SearchCombo TItem="Projekt"
+                                                 Id="ProjekteCbx"
+                                                 Items="projektChoicesForModal"
+                                                 Placeholder="-- Projekt wählen --"
+                                                 LabelSelector="@(p => p.Projektbeschreibung)"
+                                                 Search="@projektSearch"
+                                                 SearchChanged="@(val => projektSearch = val)"
+                                                 OnItemSelected="OnProjektPicked" />
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Bearbeiter</label>
+                                    <SearchCombo TItem="Benutzer"
+                                                 Id="BearbeiterCbx"
+                                                 Items="benutzerChoicesForModal"
+                                                 Placeholder="-- Bearbeiter wählen --"
+                                                 LabelSelector="@(b => b.Id == CurrentUserId
+                                                                                                      ? $"Ich ({(string.IsNullOrWhiteSpace(b.Email) ? "User" : b.Email)})"
+                                                                                                      : $"{(string.IsNullOrWhiteSpace(b.Email) ? "User" : b.Email)} (Id:{b.Id})")"
+                                         Search="@bearbeiterSearch"
+                                         SearchChanged="@(val => bearbeiterSearch = val)"
+                                         OnItemSelected="OnBearbeiterSelected" />
+                        </div>
+                    </div>
+                                        }
+                        else
+                        {
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Projekt</label>
+                                    <SearchCombo TItem="Projekt"
+                                                 Id="ProjekteCbxUser"
+                                                 Items="projektChoicesForModal"
+                                                 Placeholder="-- Projekt wählen --"
+                                                 LabelSelector="@(p => p.Projektbeschreibung)"
+                                                 Search="@projektSearch"
+                                                 SearchChanged="@(val => projektSearch = val)"
+                                                 OnItemSelected="OnProjektPicked" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Bearbeiter</label>
+                                    <div class="form-control-plaintext">
+                                        Ich (@(string.IsNullOrWhiteSpace(CurrentUserEmail) ? "User" : CurrentUserEmail))
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info mt-2 mb-0">
+                                Nur <strong>Projektleiter</strong> dürfen Aufgaben an andere zuweisen.
+                            </div>
+                        }
+
+                        <div class="mt-3">
+                            <label class="form-label mb-1">Aufgabenbeschreibung</label>
+                            <InputTextArea class="form-control" @bind-Value="editModel.Aufgabenbeschreibung" rows="3" placeholder="Was ist zu tun?" />
+                        </div>
+
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1">Fällig am</label>
+                                <InputDate class="form-control" @bind-Value="editModel.Faellig" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label mb-1">Phase</label>
+                                <InputSelect class="form-select" @bind-Value="editModel.Phase">
+                                    <option value="0">0 – Offen</option>
+                                    <option value="1">1 – In Bearbeitung</option>
+                                    <option value="2">2 – Review</option>
+                                    <option value="3">3 – Sonstiges</option>
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label mb-1">Status</label>
+                                <div class="form-control-plaintext">
+                                    <span class="badge @GetStatusClass(editModel.Erledigt)">@editModel.Erledigt</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseModal">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary">Speichern</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .row--overdue td {
+        background: #fff4f4;
+    }
+
+    .row--soon td {
+        background: #fffbe6;
+    }
+
+    .status-offen {
+        background-color: #6c757d !important;
+    }
+
+    .status-inbearbeitung {
+        background-color: #0d6efd !important;
+    }
+
+    .status-erledigt {
+        background-color: #198754 !important;
+    }
+
+    .modal-backdrop.show {
+        opacity: .35;
+    }
+</style>

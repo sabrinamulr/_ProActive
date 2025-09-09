@@ -1,0 +1,37 @@
+﻿@* Datei: Components/Comps/SearchCbx/SearchCombo.razor *@
+@* Seite: SearchCombo *@
+@typeparam TItem
+
+<div class="searchcombo-wrapper" @onfocusin="ShowList" @onfocusout="OnBlur">
+    <input class="form-control"
+           type="text"
+           id="@Id"
+           placeholder="@Placeholder"
+           value="@CurrentSearch"
+           @oninput="OnInput"
+           @onfocus="ShowList"
+           @onblur="OnBlur"
+           @onkeydown="OnKeyDown" />
+
+    @if (_showList)
+    {
+        <ul class="searchcombo-dropdown list-group">
+            @if (_filtered.Any())
+            {
+                @foreach (var item in _filtered)
+                {
+                    <li class="list-group-item list-group-item-action"
+                        @onmousedown="() => SelectItemAsync(item)"
+                        @onmousedown:stopPropagation="true"
+                        @onmousedown:preventDefault="true">
+                        @LabelSelector?.Invoke(item)
+                    </li>
+                }
+            }
+            else
+            {
+                <li class="list-group-item disabled">Keine Ergebnisse</li>
+            }
+        </ul>
+    }
+</div>

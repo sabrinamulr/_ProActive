@@ -1,0 +1,80 @@
+﻿@* @* Datei: Components/Pages/Anja/ProjektDetails.razor *@
+@* Seite: ProjektDetails *@
+
+@* @page "/projekt/{id:int}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using ProActive2508.Models.Entity.Anja
+@using ProActive2508.Service
+@rendermode InteractiveServer
+
+<h3>Projekt-Details</h3>
+
+@if (isLoading)
+{
+    <p>Lade…</p>
+}
+else if (projekt is null)
+{
+    <div class="alert alert-warning">
+        Projekt mit Id=@Id nicht gefunden.
+        <a class="ms-2" href="/meine-projekte">Zurück zur Übersicht</a>
+    </div>
+}
+else
+{
+    <div class="mb-3">
+        <a class="btn btn-sm btn-outline-secondary" href="/meine-projekte">← Zurück</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@Titel(projekt)</h5>
+            <div class="row g-2">
+                <div class="col-md-3"><strong>Projekt-Id:</strong> @projekt.Id</div>
+                <div class="col-md-3"><strong>Status:</strong> @projekt.Status</div>
+                <div class="col-md-3"><strong>Phase:</strong> @projekt.Phase</div>
+                <div class="col-md-3"><strong>ProblemId:</strong> @(projekt.ProblemId?.ToString() ?? "-")</div>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-md-4"><strong>Owner:</strong> @UserName(projekt.BenutzerId)</div>
+                <div class="col-md-4"><strong>Projektleiter:</strong> @UserName(projekt.ProjektleiterId)</div>
+                <div class="col-md-4"><strong>Auftraggeber:</strong> @UserName(projekt.AuftraggeberId)</div>
+            </div>
+        </div>
+    </div>
+
+    @if (aufgaben.Count == 0)
+    {
+        <div class="alert alert-info">Keine Aufgaben zu diesem Projekt gefunden.</div>
+    }
+    else
+    {
+        <h5>Aufgaben</h5>
+        <table class="table table-sm table-striped align-middle">
+            <thead>
+                <tr>
+                    <th style="width:80px;">Id</th>
+                    <th>Beschreibung</th>
+                    <th style="width:120px;">Fällig</th>
+                    <th style="width:120px;">Phase</th>
+                    <th style="width:140px;">Status</th>
+                    <th>Bearbeiter</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in aufgaben)
+                {
+                    <tr>
+                        <td>@a.Id</td>
+                        <td>@a.Aufgabenbeschreibung</td>
+                        <td>@a.Faellig.ToShortDateString()</td>
+                        <td>@a.Phase</td>
+                        <td>@a.Erledigt</td>
+                        <td>@UserName(a.BenutzerId)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+} *@
+ 
