@@ -12,7 +12,7 @@
     <Compile Remove="Services\**" />
     <Content Remove="Components\Pages\Anja\ProActiveTeil\**" />
     <Content Remove="Data\Anja\**" />
-    <Content Remove="Services\**" />
+    <Content Remove="Services\**" /> 
     <EmbeddedResource Remove="Components\Pages\Anja\ProActiveTeil\**" />
     <EmbeddedResource Remove="Data\Anja\**" />
     <EmbeddedResource Remove="Services\**" />
