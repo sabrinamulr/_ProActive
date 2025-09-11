@@ -20,6 +20,7 @@ using System.Security.Claims;
 var builder = WebApplication.CreateBuilder(args);
 
 // ===================== DB =====================
+//test test test
 // Nur die Factory registrieren → vermeidet Lifetime-Konflikte.
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
