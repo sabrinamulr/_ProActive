@@ -1,0 +1,66 @@
+﻿@page "/meine-projekte"
+@using Microsoft.AspNetCore.Authorization
+@rendermode InteractiveServer
+
+<h3>Projekte</h3>
+
+@if (!string.IsNullOrWhiteSpace(uiError))
+{
+    <div class="alert alert-warning d-flex justify-content-between align-items-start" role="alert">
+        <div><strong>Fehler:</strong> @uiError</div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => uiError = null">OK</button>
+    </div>
+}
+
+@if (isLoading)
+{
+    <p>Lade…</p>
+}
+else if (projects is null || !projects.Any())
+{
+    <div class="alert alert-info">Keine Projekte vorhanden.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th style="width:70px;">Id</th>
+                    <th>Beschreibung</th>
+                    <th style="width:220px;">Projektleiter</th>
+                    <th style="width:220px;">Auftraggeber</th>
+                    <th style="width:120px;">Status</th>
+                    <th style="width:120px;">Phase</th>
+                    <th style="width:140px;">Aktion</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in projects)
+                {
+                    <tr>
+                        <td>@p.Id</td>
+                        <td>
+                            <a href="@($"/projekt/{p.Id}")">@((string.IsNullOrWhiteSpace(p.Projektbeschreibung) ? "-" : p.Projektbeschreibung))</a>
+                        </td>
+                        <td>@(userLookup.TryGetValue(p.ProjektleiterId, out var pl) ? pl : $"Id:{p.ProjektleiterId}")</td>
+                        <td>@(userLookup.TryGetValue(p.AuftraggeberId, out var ag) ? ag : $"Id:{p.AuftraggeberId}")</td>
+                        <td>@p.Status</td>
+                        <td>@p.Phase</td>
+                        <td>
+                            @if (CanEdit(p))
+                            {
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenEditModal(p.Id)">Bearbeiten</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-secondary" disabled>Ansicht</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+...
