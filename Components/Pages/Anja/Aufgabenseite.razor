@@ -5,10 +5,8 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using ProActive2508.Models.Entity.Anja
-@using ProActive2508.Service
 @using ProActive2508.Components.Comps.SearchCbx
 @attribute [Authorize]
-@rendermode InteractiveServer
 
 <h3 class="mb-2">Meine Aufgaben</h3>
 
@@ -55,6 +53,7 @@ else
             <label class="form-label mb-1">Suche (Beschreibung oder Bearbeiter)</label>
             <InputText class="form-control" @bind-Value="searchMeine" placeholder='z. B. "Dokumentation" oder "max@firma.at"' />
         </div>
+
         <div class="col-6 col-md-3">
             <label class="form-label mb-1">Status</label>
             <InputSelect class="form-select" @bind-Value="statusFilterMeine">
@@ -64,12 +63,13 @@ else
                 <option value="Erledigt">Erledigt</option>
             </InputSelect>
         </div>
+
         <div class="col-6 col-md-4">
             <label class="form-label mb-1">Projekt</label>
             <InputSelect class="form-select" @bind-Value="selectedProjektMeine">
                 <option value="-1">Alle Projekte</option>
                 <option value="0">(kein Projekt)</option>
-                @foreach (var p in projektFilterListMeine)
+                @foreach (Projekt p in projektFilterListMeine)
                 {
                     <option value="@p.Id">@p.Projektbeschreibung</option>
                 }
@@ -97,7 +97,7 @@ else
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var a in MeineGefiltert)
+                    @foreach (Aufgabe a in MeineGefiltert)
                     {
                         <tr class="@GetRowClass(a)">
                             <td>@a.Id</td>
@@ -107,8 +107,16 @@ else
                             <td>@a.Phase</td>
                             <td><span class="badge @GetStatusClass(a.Erledigt)">@a.Erledigt</span></td>
                             <td class="d-flex gap-2">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@( !CanEdit(a) )" @onclick="(() => OpenEditModal(a.Id))">Bearbeiten</button>
-                                <input class="form-check-input mt-0" type="checkbox" title="Als erledigt markieren"
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        disabled="@( !CanEdit(a) )"
+                                        @onclick="(() => OpenEditModal(a.Id))">
+                                    Bearbeiten
+                                </button>
+
+                                <input class="form-check-input mt-0"
+                                       type="checkbox"
+                                       title="Als erledigt markieren"
                                        checked="@(a.Erledigt == Erledigungsstatus.Erledigt)"
                                        @onchange="(e => OnCheckboxChangedAsync(a, e?.Value is bool b && b))" />
                             </td>
@@ -128,6 +136,7 @@ else
                 <label class="form-label mb-1">Suche (Beschreibung oder Bearbeiter)</label>
                 <InputText class="form-control" @bind-Value="searchZuweisungen" placeholder='z. B. "Mockups" oder "anna@firma.at"' />
             </div>
+
             <div class="col-6 col-md-3">
                 <label class="form-label mb-1">Status</label>
                 <InputSelect class="form-select" @bind-Value="statusFilterZuweisungen">
@@ -137,12 +146,13 @@ else
                     <option value="Erledigt">Erledigt</option>
                 </InputSelect>
             </div>
+
             <div class="col-6 col-md-4">
                 <label class="form-label mb-1">Projekt</label>
                 <InputSelect class="form-select" @bind-Value="selectedProjektZuweisungen">
                     <option value="-1">Alle Projekte</option>
                     <option value="0">(kein Projekt)</option>
-                    @foreach (var p in projektFilterListZuweisungen)
+                    @foreach (Projekt p in projektFilterListZuweisungen)
                     {
                         <option value="@p.Id">@p.Projektbeschreibung</option>
                     }
@@ -171,7 +181,7 @@ else
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var a in ZuweisungenGefiltert)
+                        @foreach (Aufgabe a in ZuweisungenGefiltert)
                         {
                             <tr class="@GetRowClass(a)">
                                 <td>@a.Id</td>
@@ -180,10 +190,17 @@ else
                                 <td>@a.Faellig.ToString("dd.MM.yyyy")</td>
                                 <td>@a.Phase</td>
                                 <td><span class="badge @GetStatusClass(a.Erledigt)">@a.Erledigt</span></td>
-                                <td>@(benutzerLookup.TryGetValue(a.BenutzerId, out var mail) ? mail : $"Id:{a.BenutzerId}")</td>
+                                <td>@(benutzerLookup.TryGetValue(a.BenutzerId, out string? mail) ? mail : $"Id:{a.BenutzerId}")</td>
                                 <td class="d-flex gap-2">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="(() => OpenEditModal(a.Id))">Bearbeiten</button>
-                                    <input class="form-check-input mt-0" type="checkbox" title="Als erledigt markieren"
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            @onclick="(() => OpenEditModal(a.Id))">
+                                        Bearbeiten
+                                    </button>
+
+                                    <input class="form-check-input mt-0"
+                                           type="checkbox"
+                                           title="Als erledigt markieren"
                                            checked="@(a.Erledigt == Erledigungsstatus.Erledigt)"
                                            @onchange="(e => OnCheckboxChangedAsync(a, e?.Value is bool b && b))" />
                                 </td>
@@ -200,9 +217,11 @@ else
 @if (isModalOpen)
 {
     <div class="modal-backdrop show"></div>
+
     <div class="modal show d-block" tabindex="-1" style="--bs-modal-width: 820px;">
         <div class="modal-dialog">
             <div class="modal-content">
+
                 <div class="modal-header py-2">
                     <h5 class="modal-title">@modalTitle</h5>
                     <button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
@@ -210,6 +229,7 @@ else
 
                 <EditForm Model="editModel" OnValidSubmit="SaveAsync" FormName="AufgabeForm">
                     <DataAnnotationsValidator />
+
                     <div class="modal-body">
 
                         @if (isProjektleiter)
@@ -256,6 +276,7 @@ else
                                                  SearchChanged="@(val => projektSearch = val)"
                                                  OnItemSelected="OnProjektPicked" />
                                 </div>
+
                                 <div class="col-md-6">
                                     <label class="form-label mb-1">Bearbeiter</label>
                                     <div class="form-control-plaintext">
@@ -279,6 +300,7 @@ else
                                 <label class="form-label mb-1">Fällig am</label>
                                 <InputDate class="form-control" @bind-Value="editModel.Faellig" />
                             </div>
+
                             <div class="col-md-4">
                                 <label class="form-label mb-1">Phase</label>
                                 <InputSelect class="form-select" @bind-Value="editModel.Phase">
@@ -288,6 +310,7 @@ else
                                     <option value="3">3 – Sonstiges</option>
                                 </InputSelect>
                             </div>
+
                             <div class="col-md-4">
                                 <label class="form-label mb-1">Status</label>
                                 <div class="form-control-plaintext">
@@ -295,13 +318,16 @@ else
                                 </div>
                             </div>
                         </div>
+
                     </div>
 
                     <div class="modal-footer py-2">
                         <button type="button" class="btn btn-outline-secondary" @onclick="CloseModal">Abbrechen</button>
                         <button type="submit" class="btn btn-primary">Speichern</button>
                     </div>
+
                 </EditForm>
+
             </div>
         </div>
     </div>
