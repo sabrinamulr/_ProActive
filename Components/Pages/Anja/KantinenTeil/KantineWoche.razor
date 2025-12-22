@@ -47,9 +47,9 @@ else if (HasPlan && !IsEditMode)
             </tr>
         </thead>
         <tbody>
-            @foreach (var d in Days)
+            @foreach (KantineWoche.MenuePlan d in Days)
             {
-                var userHatAuswahlAnDiesemTag = MeineVormerkungen.Contains(d.EintragId1) || MeineVormerkungen.Contains(d.EintragId2);
+                bool userHatAuswahlAnDiesemTag = MeineVormerkungen.Contains(d.EintragId1) || MeineVormerkungen.Contains(d.EintragId2);
 
                 <tr>
                     <td class="date">@d.Tag.ToString("dddd, dd.MM.yyyy", new CultureInfo("de-DE"))</td>
@@ -121,8 +121,8 @@ else if (CanEdit)
         <div class="wocheneintragung">
             @for (int i = 0; i < WochenFormular.Count; i++)
             {
-                var wochentag = WochenFormular[i];
-                var wochentagstelle = i;
+                KantineWoche.FormRow wochentag = WochenFormular[i];
+                int wochentagstelle = i;
 
                 <div class="day-row">
                     <div class="date">@wochentag.Tag.ToString("dddd, dd.MM.yyyy", new CultureInfo("de-DE"))</div>
@@ -206,4 +206,3 @@ else
 {
     <div class="alert alert-warning">Für diese Woche gibt es noch keinen Plan.</div>
 }
-

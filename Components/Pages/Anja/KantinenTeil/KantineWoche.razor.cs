@@ -60,9 +60,11 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
         {
             IsEditMode = false;
             welchewoche = ResolveWelcheWocheFromRoute(AusgewählteWoche, e.Location);
+
             Title = (welchewoche == 0 ? "Diese Woche"
                    : (welchewoche == 1 ? "Nächste Woche"
                    : (welchewoche == 2 ? "In 2 Wochen" : $"In {welchewoche} Wochen")));
+
             await LoadAsync();
             await InvokeAsync(StateHasChanged);
         }
@@ -70,25 +72,39 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
         private int ResolveWelcheWocheFromRoute(int? pOffset, string uri)
         {
             if (pOffset.HasValue) return pOffset.Value;
-            var path = new Uri(uri).AbsolutePath.Trim('/').ToLowerInvariant();
+
+            string path = new Uri(uri).AbsolutePath.Trim('/').ToLowerInvariant();
+
             if (path.EndsWith("diesewoche")) return 0;
             if (path.EndsWith("naechstewoche")) return 1;
             if (path.EndsWith("in2wochen")) return 2;
-            var seg = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (seg.Length >= 2 && seg[^2] == "kantine" && int.TryParse(seg[^1], out var parsed)) return parsed;
+
+            string[] seg = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (seg.Length >= 2 && seg[^2] == "kantine")
+            {
+                int parsed;
+                if (int.TryParse(seg[^1], out parsed)) return parsed;
+            }
+
             return 0;
         }
 
         protected override async Task OnParametersSetAsync()
         {
             welchewoche = ResolveWelcheWocheFromRoute(AusgewählteWoche, Nav.Uri);
+
             Title = (welchewoche == 0 ? "Diese Woche"
                    : (welchewoche == 1 ? "Nächste Woche"
                    : (welchewoche == 2 ? "In 2 Wochen" : $"In {welchewoche} Wochen")));
 
-            var auth = await Auth.GetAuthenticationStateAsync();
-            var user = auth.User;
-            var roles = user.FindAll(ClaimTypes.Role).Select(r => r.Value).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            AuthenticationState authState = await Auth.GetAuthenticationStateAsync();
+            ClaimsPrincipal user = authState.User;
+
+            HashSet<string> roles = user
+                .FindAll(ClaimTypes.Role)
+                .Select((Claim r) => r.Value)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             CanEdit = roles.Contains("Koch") || roles.Contains("Admin");
 
             IsKoch = roles.Contains("Koch");
@@ -102,36 +118,43 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
         {
             Loading = true;
 
-            (Monday, Friday) = WeekService.GetWeekRange(DateTime.Today, welchewoche);
+            ValueTuple<DateTime, DateTime> range = WeekService.GetWeekRange(DateTime.Today, welchewoche);
+            Monday = range.Item1;
+            Friday = range.Item2;
+
             HasPlan = await WeekService.WeekHasPlanAsync(welchewoche);
 
             if (HasPlan && !IsEditMode)
             {
-                var data = await WeekService.LoadWeekAsync(welchewoche);
+                List<MenueplanTag> data = await WeekService.LoadWeekAsync(welchewoche);
 
-                Days = data.Select(t => new MenuePlan
+                Days = data.Select((MenueplanTag t) => new MenuePlan
                 {
                     Tag = t.Tag,
-                    Menu1 = t.Eintraege.FirstOrDefault(e => e.PositionNr == 1)?.Gericht.Gerichtname ?? "—",
-                    Menu2 = t.Eintraege.FirstOrDefault(e => e.PositionNr == 2)?.Gericht.Gerichtname ?? "—",
-                    EintragId1 = t.Eintraege.FirstOrDefault(e => e.PositionNr == 1)?.Id ?? 0,
-                    EintragId2 = t.Eintraege.FirstOrDefault(e => e.PositionNr == 2)?.Id ?? 0,
+                    Menu1 = t.Eintraege.FirstOrDefault((Menueplan e) => e.PositionNr == 1)?.Gericht.Gerichtname ?? "—",
+                    Menu2 = t.Eintraege.FirstOrDefault((Menueplan e) => e.PositionNr == 2)?.Gericht.Gerichtname ?? "—",
+                    EintragId1 = t.Eintraege.FirstOrDefault((Menueplan e) => e.PositionNr == 1)?.Id ?? 0,
+                    EintragId2 = t.Eintraege.FirstOrDefault((Menueplan e) => e.PositionNr == 2)?.Id ?? 0,
                     MenueplanTagId = t.Id
                 }).ToList();
 
-                var eintragIds = Days.SelectMany(d => new[] { d.EintragId1, d.EintragId2 }).Where(id => id > 0).ToList();
+                List<int> eintragIds = Days
+                    .SelectMany((MenuePlan d) => new[] { d.EintragId1, d.EintragId2 })
+                    .Where((int id) => id > 0)
+                    .ToList();
 
                 Counts = await Db.Vorbestellungen
-                    .Where(v => eintragIds.Contains(v.EintragId))
-                    .GroupBy(v => v.EintragId)
-                    .Select(g => new { g.Key, Cnt = g.Count() })
+                    .Where((Vorbestellung v) => eintragIds.Contains(v.EintragId))
+                    .GroupBy((Vorbestellung v) => v.EintragId)
+                    .Select((IGrouping<int, Vorbestellung> g) => new { Key = g.Key, Cnt = g.Count() })
                     .ToDictionaryAsync(x => x.Key, x => x.Cnt);
 
-                MeineVormerkungen = (await Db.Vorbestellungen
-                        .Where(v => v.BenutzerId == CurrentUserId && eintragIds.Contains(v.EintragId))
-                        .Select(v => v.EintragId)
-                        .ToListAsync())
-                    .ToHashSet();
+                List<int> myIds = await Db.Vorbestellungen
+                    .Where((Vorbestellung v) => v.BenutzerId == CurrentUserId && eintragIds.Contains(v.EintragId))
+                    .Select((Vorbestellung v) => v.EintragId)
+                    .ToListAsync();
+
+                MeineVormerkungen = myIds.ToHashSet();
 
                 WochenFormular.Clear();
             }
@@ -143,14 +166,18 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
             Loading = false;
         }
 
-        protected int GetCount(int eintragId) => Counts.TryGetValue(eintragId, out var c) ? c : 0;
+        protected int GetCount(int eintragId)
+        {
+            int c;
+            return Counts.TryGetValue(eintragId, out c) ? c : 0;
+        }
 
         protected async Task ToggleReservationExclusive(int menueplanTagId, int eintragId)
         {
             if (CurrentUserId <= 0 || eintragId <= 0) return;
 
-            var existing = await Db.Vorbestellungen
-                .FirstOrDefaultAsync(x => x.BenutzerId == CurrentUserId && x.MenueplanTagId == menueplanTagId);
+            Vorbestellung? existing = await Db.Vorbestellungen
+                .FirstOrDefaultAsync((Vorbestellung x) => x.BenutzerId == CurrentUserId && x.MenueplanTagId == menueplanTagId);
 
             if (existing is null)
             {
@@ -168,7 +195,7 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
             }
             else if (existing.EintragId != eintragId)
             {
-                var oldId = existing.EintragId;
+                int oldId = existing.EintragId;
                 existing.EintragId = eintragId;
                 Db.Vorbestellungen.Update(existing);
                 await Db.SaveChangesAsync();
@@ -187,12 +214,12 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
         {
             if (CurrentUserId <= 0) return;
 
-            var existing = await Db.Vorbestellungen
-                .FirstOrDefaultAsync(x => x.BenutzerId == CurrentUserId && x.MenueplanTagId == menueplanTagId);
+            Vorbestellung? existing = await Db.Vorbestellungen
+                .FirstOrDefaultAsync((Vorbestellung x) => x.BenutzerId == CurrentUserId && x.MenueplanTagId == menueplanTagId);
 
             if (existing is null) return;
 
-            var oldEintragId = existing.EintragId;
+            int oldEintragId = existing.EintragId;
 
             Db.Vorbestellungen.Remove(existing);
             await Db.SaveChangesAsync();
@@ -208,25 +235,25 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
         {
             if (!CanEdit) return;
 
-            var ok = await JS.InvokeAsync<bool>("confirm",
+            bool ok = await JS.InvokeAsync<bool>("confirm",
                 $"Veröffentlichung für „{Title}“ zurückziehen?\nAlle Einträge & Vormerkungen dieser Woche werden gelöscht.");
             if (!ok) return;
 
-            using var tx = await Db.Database.BeginTransactionAsync();
+            await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction tx = await Db.Database.BeginTransactionAsync();
 
-            var tags = await Db.Set<MenueplanTag>()
-                .Where(t => t.Tag >= Monday.Date && t.Tag <= Friday.Date)
-                .Include(t => t.Eintraege)
+            List<MenueplanTag> tags = await Db.Set<MenueplanTag>()
+                .Where((MenueplanTag t) => t.Tag >= Monday.Date && t.Tag <= Friday.Date)
+                .Include((MenueplanTag t) => t.Eintraege)
                 .ToListAsync();
 
-            var entryIds = tags.SelectMany(t => t.Eintraege).Select(e => e.Id).ToList();
+            List<int> entryIds = tags.SelectMany((MenueplanTag t) => t.Eintraege).Select((Menueplan e) => e.Id).ToList();
 
             if (entryIds.Count > 0)
             {
-                var vorm = await Db.Vorbestellungen.Where(v => entryIds.Contains(v.EintragId)).ToListAsync();
+                List<Vorbestellung> vorm = await Db.Vorbestellungen.Where((Vorbestellung v) => entryIds.Contains(v.EintragId)).ToListAsync();
                 if (vorm.Count > 0) Db.Vorbestellungen.RemoveRange(vorm);
 
-                Db.Set<Menueplan>().RemoveRange(tags.SelectMany(t => t.Eintraege));
+                Db.Set<Menueplan>().RemoveRange(tags.SelectMany((MenueplanTag t) => t.Eintraege));
             }
 
             if (tags.Count > 0)
@@ -248,31 +275,31 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
         protected async Task FillFormForWeekAsync()
         {
             WochenFormular = Enumerable.Range(0, 5)
-                                       .Select(i => new FormRow { Tag = Monday.AddDays(i) })
+                                       .Select((int i) => new FormRow { Tag = Monday.AddDays(i) })
                                        .ToList();
 
             if (HasPlan)
             {
-                var data = await WeekService.LoadWeekAsync(welchewoche);
-                foreach (var row in WochenFormular)
+                List<MenueplanTag> data = await WeekService.LoadWeekAsync(welchewoche);
+                foreach (FormRow row in WochenFormular)
                 {
-                    var day = data.FirstOrDefault(d => d.Tag.Date == row.Tag.Date);
+                    MenueplanTag? day = data.FirstOrDefault((MenueplanTag d) => d.Tag.Date == row.Tag.Date);
                     if (day is null) continue;
 
-                    var e1 = day.Eintraege.FirstOrDefault(e => e.PositionNr == 1)?.Gericht?.Gerichtname;
-                    var e2 = day.Eintraege.FirstOrDefault(e => e.PositionNr == 2)?.Gericht?.Gerichtname;
+                    string? e1 = day.Eintraege.FirstOrDefault((Menueplan e) => e.PositionNr == 1)?.Gericht?.Gerichtname;
+                    string? e2 = day.Eintraege.FirstOrDefault((Menueplan e) => e.PositionNr == 2)?.Gericht?.Gerichtname;
 
                     row.Menu1 = e1;
                     row.Menu2 = e2;
 
                     if (!string.IsNullOrWhiteSpace(e1))
                     {
-                        var info = await WeekService.FindGerichtInfoAsync(e1);
+                        GerichtInfo? info = await WeekService.FindGerichtInfoAsync(e1);
                         if (info != null) { row.Menu1Allergene = info.Allergene; row.Menu1Preis = info.LastPrice; }
                     }
                     if (!string.IsNullOrWhiteSpace(e2))
                     {
-                        var info = await WeekService.FindGerichtInfoAsync(e2);
+                        GerichtInfo? info = await WeekService.FindGerichtInfoAsync(e2);
                         if (info != null) { row.Menu2Allergene = info.Allergene; row.Menu2Preis = info.LastPrice; }
                     }
                 }
@@ -280,7 +307,7 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
 
             for (int i = 0; i < WochenFormular.Count; i++)
             {
-                var r = WochenFormular[i];
+                FormRow r = WochenFormular[i];
                 r.Menu1Search = r.Menu1 ?? string.Empty;
                 r.Menu2Search = r.Menu2 ?? string.Empty;
                 r.Menu1Items = await QueryGerichteAsync(r.Menu1Search);
@@ -305,7 +332,7 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
 
         protected bool IsFormComplete =>
             WochenFormular.Count > 0 &&
-            WochenFormular.All(r =>
+            WochenFormular.All((FormRow r) =>
                 !string.IsNullOrWhiteSpace(r.Menu1) &&
                 !string.IsNullOrWhiteSpace(r.Menu2) &&
                 !string.IsNullOrWhiteSpace(r.Menu1Allergene) &&
@@ -319,12 +346,12 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
             if (WochenFormular.Count == 0)
                 return (false, "Keine Tage im Formular.");
 
-            var ci = new CultureInfo("de-DE");
+            CultureInfo ci = new CultureInfo("de-DE");
 
             for (int i = 0; i < WochenFormular.Count; i++)
             {
-                var r = WochenFormular[i];
-                var tagText = r.Tag.ToString("dddd, dd.MM.yyyy", ci);
+                FormRow r = WochenFormular[i];
+                string tagText = r.Tag.ToString("dddd, dd.MM.yyyy", ci);
 
                 if (string.IsNullOrWhiteSpace(r.Menu1) || string.IsNullOrWhiteSpace(r.Menu2))
                     return (false, $"Bitte am {tagText} beide Menüs eintragen.");
@@ -343,57 +370,53 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
         protected async Task OnAllergeneChanged(int rowIndex, int which)
         {
             if (rowIndex < 0 || rowIndex >= WochenFormular.Count) return;
-            var row = WochenFormular[rowIndex];
+            FormRow row = WochenFormular[rowIndex];
 
-            var gerichtName = (which == 1 ? row.Menu1 : row.Menu2)?.Trim();
-            var codes = (which == 1 ? row.Menu1Allergene : row.Menu2Allergene) ?? string.Empty;
+            string? gerichtName = (which == 1 ? row.Menu1 : row.Menu2)?.Trim();
+            string codes = (which == 1 ? row.Menu1Allergene : row.Menu2Allergene) ?? string.Empty;
 
             if (string.IsNullOrWhiteSpace(gerichtName)) return;
 
-            // Sicherstellen, dass das Gericht existiert (sonst wären Updates no-op)
             await EnsureGerichtExistsAsync(gerichtName);
             await WeekService.UpdateAllergeneForGerichtAsync(gerichtName, codes);
             await InvokeAsync(StateHasChanged);
         }
 
-
         protected async Task OnPriceChanged(int rowIndex, int which)
         {
             if (rowIndex < 0 || rowIndex >= WochenFormular.Count) return;
 
-            var row = WochenFormular[rowIndex];
-            var gerichtName = (which == 1 ? row.Menu1 : row.Menu2)?.Trim();
-            var neuerPreis = (which == 1 ? row.Menu1Preis : row.Menu2Preis);
+            FormRow row = WochenFormular[rowIndex];
+            string? gerichtName = (which == 1 ? row.Menu1 : row.Menu2)?.Trim();
+            decimal? neuerPreis = (which == 1 ? row.Menu1Preis : row.Menu2Preis);
 
             if (string.IsNullOrWhiteSpace(gerichtName) || !neuerPreis.HasValue) return;
 
-            var rounded = Math.Round(neuerPreis.Value, 2, MidpointRounding.AwayFromZero);
+            decimal rounded = Math.Round(neuerPreis.Value, 2, MidpointRounding.AwayFromZero);
 
-            // Sicherstellen, dass das Gericht existiert (sonst wären Updates no-op)
             await EnsureGerichtExistsAsync(gerichtName);
             await WeekService.EnsurePreisForGerichtAsync(gerichtName, rounded);
 
             await InvokeAsync(StateHasChanged);
         }
 
-
         protected async Task OnMenuSearchChangedAsync(int rowIndex, int which, string value)
         {
-            var row = WochenFormular[rowIndex];
+            FormRow row = WochenFormular[rowIndex];
 
             if (which == 1)
             {
                 row.Menu1Search = value;
-                var list = await QueryGerichteAsync(value);
-                if (!string.IsNullOrWhiteSpace(value) && !list.Any(s => s.Equals(value, StringComparison.OrdinalIgnoreCase)))
+                List<string> list = await QueryGerichteAsync(value);
+                if (!string.IsNullOrWhiteSpace(value) && !list.Any((string s) => s.Equals(value, StringComparison.OrdinalIgnoreCase)))
                     list.Insert(0, value.Trim());
                 row.Menu1Items = list;
             }
             else
             {
                 row.Menu2Search = value;
-                var list = await QueryGerichteAsync(value);
-                if (!string.IsNullOrWhiteSpace(value) && !list.Any(s => s.Equals(value, StringComparison.OrdinalIgnoreCase)))
+                List<string> list = await QueryGerichteAsync(value);
+                if (!string.IsNullOrWhiteSpace(value) && !list.Any((string s) => s.Equals(value, StringComparison.OrdinalIgnoreCase)))
                     list.Insert(0, value.Trim());
                 row.Menu2Items = list;
             }
@@ -403,7 +426,7 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
 
         protected async Task OnMenuSelected(int rowIndex, int which, string value)
         {
-            var row = WochenFormular[rowIndex];
+            FormRow row = WochenFormular[rowIndex];
 
             if (which == 1)
             {
@@ -419,57 +442,54 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
             await OnMenuChanged(rowIndex, which, forcePopulate: true);
         }
 
-        // freier Text (Enter/Blur) -> Gericht anlegen/sicherstellen + Stammdaten nachladen
         protected async Task OnMenuTextCommittedAsync(int rowIndex, int which, string value)
         {
             if (_commitBusy) return;
             _commitBusy = true;
+
             try
             {
-                var name = (value ?? string.Empty).Trim();
+                string name = (value ?? string.Empty).Trim();
                 if (string.IsNullOrWhiteSpace(name) || rowIndex < 0 || rowIndex >= WochenFormular.Count) return;
 
-                // 1) Gericht in der DB sicherstellen (Persist)
-                _ = await EnsureGerichtExistsAsync(name);
+                int _ = await EnsureGerichtExistsAsync(name);
 
-                var row = WochenFormular[rowIndex];
+                FormRow row = WochenFormular[rowIndex];
 
-                // 2) UI-State setzen
                 if (which == 1) { row.Menu1 = name; row.Menu1Search = name; }
                 else { row.Menu2 = name; row.Menu2Search = name; }
 
-                // 3) Dropdown-Items sofort frisch laden (inkl. neuem Gericht)
-                var fresh = await QueryGerichteAsync(name);
-                if (!fresh.Any(s => s.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                List<string> fresh = await QueryGerichteAsync(name);
+                if (!fresh.Any((string s) => s.Equals(name, StringComparison.OrdinalIgnoreCase)))
                     fresh.Insert(0, name);
 
                 if (which == 1) row.Menu1Items = fresh;
                 else row.Menu2Items = fresh;
 
-                // 4) Stammdaten (Preis/Allergene) nachziehen → jetzt mit forcePopulate
                 await OnMenuChanged(rowIndex, which, forcePopulate: true);
 
                 await InvokeAsync(StateHasChanged);
             }
             finally { _commitBusy = false; }
         }
+
         private async Task RefreshAllSearchListsAsync(string? ensureName = null)
         {
             for (int i = 0; i < WochenFormular.Count; i++)
             {
-                var r = WochenFormular[i];
+                FormRow r = WochenFormular[i];
 
-                var list1 = await QueryGerichteAsync(r.Menu1Search);
+                List<string> list1 = await QueryGerichteAsync(r.Menu1Search);
                 if (!string.IsNullOrWhiteSpace(ensureName) &&
-                    !list1.Any(s => s.Equals(ensureName, StringComparison.OrdinalIgnoreCase)))
+                    !list1.Any((string s) => s.Equals(ensureName, StringComparison.OrdinalIgnoreCase)))
                 {
                     list1.Insert(0, ensureName);
                 }
                 r.Menu1Items = list1;
 
-                var list2 = await QueryGerichteAsync(r.Menu2Search);
+                List<string> list2 = await QueryGerichteAsync(r.Menu2Search);
                 if (!string.IsNullOrWhiteSpace(ensureName) &&
-                    !list2.Any(s => s.Equals(ensureName, StringComparison.OrdinalIgnoreCase)))
+                    !list2.Any((string s) => s.Equals(ensureName, StringComparison.OrdinalIgnoreCase)))
                 {
                     list2.Insert(0, ensureName);
                 }
@@ -477,26 +497,27 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
             }
         }
 
-        // nutzt eigenen DbContext aus Factory (keine Parallelnutzung von "Db")
         private async Task<List<string>> QueryGerichteAsync(string? term)
         {
-            await using var ctx = await DbFactory.CreateDbContextAsync();
-            var q = ctx.Gerichte.AsNoTracking().Select(g => g.Gerichtname);
+            await using AppDbContext ctx = await DbFactory.CreateDbContextAsync();
+
+            IQueryable<string> q = ctx.Gerichte.AsNoTracking().Select((Gericht g) => g.Gerichtname);
             if (!string.IsNullOrWhiteSpace(term))
             {
-                var t = term.Trim();
-                q = q.Where(n => EF.Functions.Like(n, $"%{t}%"));
+                string t = term.Trim();
+                q = q.Where((string n) => EF.Functions.Like(n, $"%{t}%"));
             }
-            return await q.OrderBy(n => n).Take(20).ToListAsync();
+
+            return await q.OrderBy((string n) => n).Take(20).ToListAsync();
         }
 
         protected async Task OnMenuChanged(int index, int which, bool forcePopulate = false)
         {
-            var row = WochenFormular[index];
-            var name = (which == 1 ? row.Menu1 : row.Menu2) ?? string.Empty;
+            FormRow row = WochenFormular[index];
+            string name = (which == 1 ? row.Menu1 : row.Menu2) ?? string.Empty;
             if (string.IsNullOrWhiteSpace(name)) return;
 
-            var info = await WeekService.FindGerichtInfoAsync(name);
+            GerichtInfo? info = await WeekService.FindGerichtInfoAsync(name);
             if (info is null) return;
 
             if (which == 1)
@@ -521,7 +542,7 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
 
         protected async Task SaveAsync()
         {
-            var check = ValidateWeekForm();
+            (bool ok, string msg) check = ValidateWeekForm();
             if (!check.ok)
             {
                 Message = check.msg;
@@ -531,8 +552,6 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
             try
             {
                 await ReplaceWeekPreservingReservationsAsync();
-
-                // NEU: Alle Stammdaten (Preis/Allergene) der UI jetzt definitiv in die DB schreiben
                 await PersistStammdatenAsync();
 
                 Message = IsEditMode ? $"{Title} wurde aktualisiert." : $"{Title} wurde angelegt.";
@@ -547,31 +566,32 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
             }
         }
 
-        // NEU: wird von SaveAsync aufgerufen, damit die DB garantiert den UI-Stand bekommt
         private async Task PersistStammdatenAsync()
         {
-            foreach (var r in WochenFormular)
+            foreach (FormRow r in WochenFormular)
             {
                 if (!string.IsNullOrWhiteSpace(r.Menu1))
                 {
-                    var n1 = r.Menu1.Trim();
+                    string n1 = r.Menu1.Trim();
                     await EnsureGerichtExistsAsync(n1);
                     await WeekService.UpdateAllergeneForGerichtAsync(n1, r.Menu1Allergene ?? string.Empty);
+
                     if (r.Menu1Preis.HasValue)
                     {
-                        var p1 = Math.Round(r.Menu1Preis.Value, 2, MidpointRounding.AwayFromZero);
+                        decimal p1 = Math.Round(r.Menu1Preis.Value, 2, MidpointRounding.AwayFromZero);
                         await WeekService.EnsurePreisForGerichtAsync(n1, p1);
                     }
                 }
 
                 if (!string.IsNullOrWhiteSpace(r.Menu2))
                 {
-                    var n2 = r.Menu2.Trim();
+                    string n2 = r.Menu2.Trim();
                     await EnsureGerichtExistsAsync(n2);
                     await WeekService.UpdateAllergeneForGerichtAsync(n2, r.Menu2Allergene ?? string.Empty);
+
                     if (r.Menu2Preis.HasValue)
                     {
-                        var p2 = Math.Round(r.Menu2Preis.Value, 2, MidpointRounding.AwayFromZero);
+                        decimal p2 = Math.Round(r.Menu2Preis.Value, 2, MidpointRounding.AwayFromZero);
                         await WeekService.EnsurePreisForGerichtAsync(n2, p2);
                     }
                 }
@@ -580,26 +600,27 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
 
         private async Task ReplaceWeekPreservingReservationsAsync()
         {
-            using var tx = await Db.Database.BeginTransactionAsync();
+            await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction tx = await Db.Database.BeginTransactionAsync();
 
-            var existingTags = await Db.Set<MenueplanTag>()
-                .Where(t => t.Tag >= Monday.Date && t.Tag <= Friday.Date)
-                .Include(t => t.Eintraege)
+            List<MenueplanTag> existingTags = await Db.Set<MenueplanTag>()
+                .Where((MenueplanTag t) => t.Tag >= Monday.Date && t.Tag <= Friday.Date)
+                .Include((MenueplanTag t) => t.Eintraege)
                 .ToListAsync();
 
-            var byDate = existingTags.ToDictionary(t => t.Tag.Date);
+            Dictionary<DateTime, MenueplanTag> byDate = existingTags.ToDictionary((MenueplanTag t) => t.Tag.Date);
 
-            var desired = new List<(DateTime Tag, int Gericht1, int Gericht2)>();
-            foreach (var r in WochenFormular.OrderBy(x => x.Tag))
+            List<(DateTime Tag, int Gericht1, int Gericht2)> desired = new List<(DateTime Tag, int Gericht1, int Gericht2)>();
+            foreach (FormRow r in WochenFormular.OrderBy((FormRow x) => x.Tag))
             {
-                var g1 = await ResolveGerichtIdAsync(r.Menu1!.Trim());
-                var g2 = await ResolveGerichtIdAsync(r.Menu2!.Trim());
+                int g1 = await ResolveGerichtIdAsync(r.Menu1!.Trim());
+                int g2 = await ResolveGerichtIdAsync(r.Menu2!.Trim());
                 desired.Add((r.Tag.Date, g1, g2));
             }
 
-            foreach (var d in desired)
+            foreach ((DateTime Tag, int Gericht1, int Gericht2) d in desired)
             {
-                if (!byDate.TryGetValue(d.Tag, out var tagEntity))
+                MenueplanTag? tagEntity;
+                if (!byDate.TryGetValue(d.Tag, out tagEntity))
                 {
                     tagEntity = new MenueplanTag { Tag = d.Tag };
                     Db.Set<MenueplanTag>().Add(tagEntity);
@@ -610,44 +631,49 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
                     continue;
                 }
 
-                var old1 = tagEntity.Eintraege.FirstOrDefault(e => e.PositionNr == 1);
+                Menueplan? old1 = tagEntity.Eintraege.FirstOrDefault((Menueplan e) => e.PositionNr == 1);
                 if (old1 is null)
                 {
                     Db.Set<Menueplan>().Add(new Menueplan { MenueplanTagId = tagEntity.Id, PositionNr = 1, GerichtId = d.Gericht1 });
                 }
                 else if (old1.GerichtId != d.Gericht1)
                 {
-                    var v1 = await Db.Vorbestellungen.Where(v => v.EintragId == old1.Id).ToListAsync();
+                    List<Vorbestellung> v1 = await Db.Vorbestellungen.Where((Vorbestellung v) => v.EintragId == old1.Id).ToListAsync();
                     if (v1.Count > 0) Db.Vorbestellungen.RemoveRange(v1);
+
                     Db.Set<Menueplan>().Remove(old1);
                     Db.Set<Menueplan>().Add(new Menueplan { MenueplanTagId = tagEntity.Id, PositionNr = 1, GerichtId = d.Gericht1 });
                 }
 
-                var old2 = tagEntity.Eintraege.FirstOrDefault(e => e.PositionNr == 2);
+                Menueplan? old2 = tagEntity.Eintraege.FirstOrDefault((Menueplan e) => e.PositionNr == 2);
                 if (old2 is null)
                 {
                     Db.Set<Menueplan>().Add(new Menueplan { MenueplanTagId = tagEntity.Id, PositionNr = 2, GerichtId = d.Gericht2 });
                 }
                 else if (old2.GerichtId != d.Gericht2)
                 {
-                    var v2 = await Db.Vorbestellungen.Where(v => v.EintragId == old2.Id).ToListAsync();
+                    List<Vorbestellung> v2 = await Db.Vorbestellungen.Where((Vorbestellung v) => v.EintragId == old2.Id).ToListAsync();
                     if (v2.Count > 0) Db.Vorbestellungen.RemoveRange(v2);
+
                     Db.Set<Menueplan>().Remove(old2);
                     Db.Set<Menueplan>().Add(new Menueplan { MenueplanTagId = tagEntity.Id, PositionNr = 2, GerichtId = d.Gericht2 });
                 }
             }
 
-            var desiredDates = desired.Select(x => x.Tag).ToHashSet();
-            var toDeleteTags = existingTags.Where(t => !desiredDates.Contains(t.Tag.Date)).ToList();
+            HashSet<DateTime> desiredDates = desired.Select(((DateTime Tag, int Gericht1, int Gericht2) x) => x.Tag).ToHashSet();
+            List<MenueplanTag> toDeleteTags = existingTags.Where((MenueplanTag t) => !desiredDates.Contains(t.Tag.Date)).ToList();
+
             if (toDeleteTags.Count > 0)
             {
-                var delEntryIds = toDeleteTags.SelectMany(t => t.Eintraege).Select(e => e.Id).ToList();
+                List<int> delEntryIds = toDeleteTags.SelectMany((MenueplanTag t) => t.Eintraege).Select((Menueplan e) => e.Id).ToList();
                 if (delEntryIds.Count > 0)
                 {
-                    var v = await Db.Vorbestellungen.Where(x => delEntryIds.Contains(x.EintragId)).ToListAsync();
+                    List<Vorbestellung> v = await Db.Vorbestellungen.Where((Vorbestellung x) => delEntryIds.Contains(x.EintragId)).ToListAsync();
                     if (v.Count > 0) Db.Vorbestellungen.RemoveRange(v);
-                    Db.Set<Menueplan>().RemoveRange(toDeleteTags.SelectMany(t => t.Eintraege));
+
+                    Db.Set<Menueplan>().RemoveRange(toDeleteTags.SelectMany((MenueplanTag t) => t.Eintraege));
                 }
+
                 Db.Set<MenueplanTag>().RemoveRange(toDeleteTags);
             }
 
@@ -657,12 +683,13 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
 
         private async Task<int> ResolveGerichtIdAsync(string name)
         {
-            var n = (name ?? string.Empty).Trim();
-            var existing = await Db.Gerichte.FirstOrDefaultAsync(x => x.Gerichtname.ToUpper() == n.ToUpper());
+            string n = (name ?? string.Empty).Trim();
+            Gericht? existing = await Db.Gerichte.FirstOrDefaultAsync((Gericht x) => x.Gerichtname.ToUpper() == n.ToUpper());
             if (existing is not null) return existing.Id;
 
-            var neu = new Gericht { Gerichtname = n };
+            Gericht neu = new Gericht { Gerichtname = n };
             Db.Gerichte.Add(neu);
+
             try
             {
                 await Db.SaveChangesAsync();
@@ -670,28 +697,27 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
             }
             catch (DbUpdateException ex) when (IsUniqueViolation(ex))
             {
-                // Parallel angelegt: Gewinner holen
-                var winner = await Db.Gerichte.AsNoTracking()
-                    .FirstAsync(x => x.Gerichtname.ToUpper() == n.ToUpper());
+                Gericht winner = await Db.Gerichte.AsNoTracking()
+                    .FirstAsync((Gericht x) => x.Gerichtname.ToUpper() == n.ToUpper());
                 return winner.Id;
             }
         }
 
-        // eigener Context aus Factory (keine parallele Nutzung von "Db")
         private async Task<int> EnsureGerichtExistsAsync(string name)
         {
-            var n = (name ?? string.Empty).Trim();
+            string n = (name ?? string.Empty).Trim();
             if (n.Length == 0) return 0;
 
-            await using var ctx = await DbFactory.CreateDbContextAsync();
+            await using AppDbContext ctx = await DbFactory.CreateDbContextAsync();
 
-            var existing = await ctx.Gerichte
+            Gericht? existing = await ctx.Gerichte
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Gerichtname.ToUpper() == n.ToUpper());
+                .FirstOrDefaultAsync((Gericht x) => x.Gerichtname.ToUpper() == n.ToUpper());
             if (existing is not null) return existing.Id;
 
-            var neu = new Gericht { Gerichtname = n };
+            Gericht neu = new Gericht { Gerichtname = n };
             ctx.Gerichte.Add(neu);
+
             try
             {
                 await ctx.SaveChangesAsync();
@@ -699,9 +725,9 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
             }
             catch (DbUpdateException ex) when (IsUniqueViolation(ex))
             {
-                var winner = await ctx.Gerichte
+                Gericht winner = await ctx.Gerichte
                     .AsNoTracking()
-                    .FirstAsync(x => x.Gerichtname.ToUpper() == n.ToUpper());
+                    .FirstAsync((Gericht x) => x.Gerichtname.ToUpper() == n.ToUpper());
                 return winner.Id;
             }
         }
@@ -716,18 +742,18 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
         // ---- PDF-Export ----
         protected async Task ExportPdfAsync()
         {
-            var data = await WeekService.LoadWeekAsync(welchewoche);
+            List<MenueplanTag> data = await WeekService.LoadWeekAsync(welchewoche);
 
-            var pdfDays = new List<PdfMenuDay>();
+            List<PdfMenuDay> pdfDays = new List<PdfMenuDay>();
             decimal? commonPrice = null;
 
-            foreach (var t in data.OrderBy(d => d.Tag))
+            foreach (MenueplanTag t in data.OrderBy((MenueplanTag d) => d.Tag))
             {
-                var e1 = t.Eintraege.FirstOrDefault(e => e.PositionNr == 1)?.Gericht?.Gerichtname ?? string.Empty;
-                var e2 = t.Eintraege.FirstOrDefault(e => e.PositionNr == 2)?.Gericht?.Gerichtname ?? string.Empty;
+                string e1 = t.Eintraege.FirstOrDefault((Menueplan e) => e.PositionNr == 1)?.Gericht?.Gerichtname ?? string.Empty;
+                string e2 = t.Eintraege.FirstOrDefault((Menueplan e) => e.PositionNr == 2)?.Gericht?.Gerichtname ?? string.Empty;
 
-                var i1 = string.IsNullOrWhiteSpace(e1) ? null : await WeekService.FindGerichtInfoAsync(e1);
-                var i2 = string.IsNullOrWhiteSpace(e2) ? null : await WeekService.FindGerichtInfoAsync(e2);
+                GerichtInfo? i1 = string.IsNullOrWhiteSpace(e1) ? null : await WeekService.FindGerichtInfoAsync(e1);
+                GerichtInfo? i2 = string.IsNullOrWhiteSpace(e2) ? null : await WeekService.FindGerichtInfoAsync(e2);
 
                 if (i1?.LastPrice is decimal p1) commonPrice ??= p1;
                 if (i2?.LastPrice is decimal p2) commonPrice ??= p2;
@@ -742,10 +768,10 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
                 });
             }
 
-            var logoPath = Path.Combine(Environment.CurrentDirectory, "wwwroot", "images", "logo.png");
-            if (!File.Exists(logoPath)) logoPath = null;
+            string logoPath = Path.Combine(Environment.CurrentDirectory, "wwwroot", "images", "logo.png");
+            if (!File.Exists(logoPath)) logoPath = null!;
 
-            var bytes = await PdfService.BuildMenuplanPdfAsync(
+            byte[] bytes = await PdfService.BuildMenuplanPdfAsync(
                 Monday.Date, Friday.Date,
                 kantinenName: "MAGNA Weiz",
                 title: "MENÜPLAN",
@@ -754,8 +780,8 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
                 logoPath: logoPath
             );
 
-            var base64 = Convert.ToBase64String(bytes);
-            var fileName = $"Menueplan_{Monday:yyyyMMdd}_{Friday:yyyyMMdd}.pdf";
+            string base64 = Convert.ToBase64String(bytes);
+            string fileName = $"Menueplan_{Monday:yyyyMMdd}_{Friday:yyyyMMdd}.pdf";
             await JS.InvokeVoidAsync("downloadFileFromBytes", fileName, base64);
         }
 
@@ -766,12 +792,14 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
 
         private int GetUserIdFromClaims(ClaimsPrincipal user)
         {
-            var idStr =
+            string idStr =
                 user.FindFirstValue(ClaimTypes.NameIdentifier) ??
                 user.FindFirstValue("sub") ??
                 user.FindFirstValue("user_id") ??
                 "0";
-            return int.TryParse(idStr, out var id) ? id : 0;
+
+            int id;
+            return int.TryParse(idStr, out id) ? id : 0;
         }
 
         // ---- VMs ----
