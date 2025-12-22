@@ -7,6 +7,7 @@
 @using ProActive2508.Models.Entity.Anja
 @using ProActive2508.Components.Comps.SearchCbx
 @attribute [Authorize]
+@rendermode InteractiveServer
 
 <h3 class="mb-2">Meine Aufgaben</h3>
 
@@ -28,7 +29,11 @@ else
         <button type="button" class="btn btn-primary" @onclick="OpenCreateModal">Aufgabe anlegen</button>
 
         <div class="form-check">
-            <input id="showDone" class="form-check-input" type="checkbox" checked="@showDone" @onchange="OnToggleShowDoneChanged" />
+            <input id="showDone"
+                   class="form-check-input"
+                   type="checkbox"
+                   checked="@showDone"
+                   @onchange="OnToggleShowDoneChanged" />
             <label class="form-check-label" for="showDone">Erledigte anzeigen</label>
         </div>
 
@@ -292,7 +297,10 @@ else
 
                         <div class="mt-3">
                             <label class="form-label mb-1">Aufgabenbeschreibung</label>
-                            <InputTextArea class="form-control" @bind-Value="editModel.Aufgabenbeschreibung" rows="3" placeholder="Was ist zu tun?" />
+                            <InputTextArea class="form-control"
+                                           @bind-Value="editModel.Aufgabenbeschreibung"
+                                           rows="3"
+                                           placeholder="Was ist zu tun?" />
                         </div>
 
                         <div class="row g-3 mt-1">

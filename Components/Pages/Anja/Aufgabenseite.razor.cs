@@ -28,6 +28,8 @@ public partial class Aufgabenseite : ComponentBase
     protected string? uiError = null;
 
     protected bool showDone = false;
+
+    // NUR Rolle entscheidet!
     protected bool isProjektleiter = false;
 
     protected string searchMeine = string.Empty;
@@ -73,7 +75,12 @@ public partial class Aufgabenseite : ComponentBase
             AuthenticationState authState = await Auth.GetAuthenticationStateAsync();
             ClaimsPrincipal user = authState.User;
 
-            CurrentUserEmail = user.Identity?.Name ?? string.Empty;
+            // Email stabiler holen (Name ist oft NICHT die Email)
+            CurrentUserEmail =
+                user.FindFirst(ClaimTypes.Email)?.Value ??
+                user.FindFirst("email")?.Value ??
+                user.Identity?.Name ??
+                string.Empty;
 
             string? idClaim =
                 user.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
@@ -91,37 +98,35 @@ public partial class Aufgabenseite : ComponentBase
 
             CurrentUserId = parsedId;
 
+            if (CurrentUserId <= 0)
+            {
+                uiError = "Kein gültiger Benutzer gefunden (CurrentUserId=0). Bitte neu anmelden oder Benutzer/Claims prüfen.";
+                return;
+            }
+
+            // ✅ NUR Rolle entscheidet
             isProjektleiter = user.IsInRole("Projektleiter");
 
-            if (!isProjektleiter)
-            {
-                try
-                {
-                    projekteAlsLeiter = await Db.Set<Projekt>()
-                        .Where(p => p.ProjektleiterId == CurrentUserId)
-                        .OrderBy(p => p.Projektbeschreibung)
-                        .ToListAsync();
-
-                    isProjektleiter = projekteAlsLeiter.Count > 0;
-                }
-                catch
-                {
-                    projekteAlsLeiter = new List<Projekt>();
-                }
-            }
-            else
+            // Projekte laden (Projektleiter: alle, sonst: später projektIds-abhängig)
+            if (isProjektleiter)
             {
                 projekteAlsLeiter = await Db.Set<Projekt>()
                     .OrderBy(p => p.Projektbeschreibung)
                     .ToListAsync();
             }
+            else
+            {
+                projekteAlsLeiter = new List<Projekt>();
+            }
 
+            // Meine Aufgaben
             meineAufgaben = await Db.Set<Aufgabe>()
                 .AsNoTracking()
                 .Where(a => a.BenutzerId == CurrentUserId)
                 .OrderBy(a => a.Faellig)
                 .ToListAsync();
 
+            // Zuweisungen von mir (nur Projektleiter)
             if (isProjektleiter)
             {
                 IQueryable<Aufgabe> q = Db.Set<Aufgabe>().AsNoTracking();
@@ -136,6 +141,7 @@ public partial class Aufgabenseite : ComponentBase
                 }
                 else
                 {
+                    // Fallback: alle Aufgaben in Projekten, die ich leite (wenn du das NICHT willst, entferne diesen Block)
                     List<int> leitProjIds = projekteAlsLeiter.Select(p => p.Id).ToList();
                     q = q.Where(a => a.ProjektId.HasValue && leitProjIds.Contains(a.ProjektId.Value));
                 }
@@ -147,6 +153,7 @@ public partial class Aufgabenseite : ComponentBase
                 zuweisungenVonMir.Clear();
             }
 
+            // Projekt-IDs sammeln, die in den Aufgaben vorkommen
             List<int> projektIds = meineAufgaben.Select(a => a.ProjektId)
                 .Concat(zuweisungenVonMir.Select(a => a.ProjektId))
                 .Where(id => id.HasValue && id.Value > 0)
@@ -154,15 +161,18 @@ public partial class Aufgabenseite : ComponentBase
                 .Distinct()
                 .ToList();
 
+            // Projekt Lookup
             projektLookup = await Db.Set<Projekt>()
                 .Where(p => projektIds.Contains(p.Id))
                 .ToDictionaryAsync(p => p.Id, p => p.Projektbeschreibung);
 
+            // Benutzer-IDs sammeln (Bearbeiter)
             List<int> benutzerIds = meineAufgaben.Select(a => a.BenutzerId)
                 .Concat(zuweisungenVonMir.Select(a => a.BenutzerId))
                 .Distinct()
                 .ToList();
 
+            // Nur die notwendigen Benutzer holen
             List<(int Id, string? Email)> benutzerMails = await Db.Set<Benutzer>()
                 .Where(b => benutzerIds.Contains(b.Id))
                 .Select(b => new ValueTuple<int, string?>(b.Id, b.Email))
@@ -173,6 +183,7 @@ public partial class Aufgabenseite : ComponentBase
                 b => b.Email ?? $"Id:{b.Id}"
             );
 
+            // Projekt-Filterlisten
             if (isProjektleiter)
             {
                 projektFilterListMeine = projekteAlsLeiter.ToList();
@@ -188,6 +199,7 @@ public partial class Aufgabenseite : ComponentBase
                 projektFilterListZuweisungen = new List<Projekt>();
             }
 
+            // Modal-Projekt-Auswahl
             Projekt keinProjekt = new Projekt { Id = 0, Projektbeschreibung = "(kein Projekt)" };
 
             if (isProjektleiter)
@@ -205,8 +217,9 @@ public partial class Aufgabenseite : ComponentBase
                 projektChoicesForModal.AddRange(alle);
             }
 
+            // Benutzer-Auswahl (Modal)
             benutzerChoices = benutzerMails
-                .Select(b => new Benutzer { Id = b.Id, Email = b.Email })
+                .Select(b => new Benutzer { Id = b.Id, Email = b.Email ?? string.Empty })
                 .ToList();
 
             Benutzer? me = benutzerChoices.FirstOrDefault(b => b.Id == CurrentUserId);
@@ -363,6 +376,12 @@ public partial class Aufgabenseite : ComponentBase
     {
         uiError = null;
 
+        if (CurrentUserId <= 0)
+        {
+            uiError = "Speichern nicht möglich: Kein gültiger Benutzer (CurrentUserId=0).";
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(editModel.Aufgabenbeschreibung))
         {
             uiError = "Bitte eine Aufgabenbeschreibung eingeben.";
@@ -374,6 +393,7 @@ public partial class Aufgabenseite : ComponentBase
             editModel.ErstellVon = CurrentUserId;
         }
 
+        // 🔒 Serverseitig erzwingen: Nur Projektleiter dürfen an andere zuweisen
         if (!isProjektleiter)
         {
             if (editModel.BenutzerId != CurrentUserId)
@@ -435,10 +455,14 @@ public partial class Aufgabenseite : ComponentBase
         }
     }
 
-    protected async Task OnToggleShowDoneChanged(ChangeEventArgs e)
+    protected Task OnToggleShowDoneChanged(ChangeEventArgs e)
     {
-        showDone = e != null && e.Value is bool b && b;
-        await Task.Yield();
+        if (e?.Value is bool b)
+            showDone = b;
+        else
+            showDone = false;
+
+        return Task.CompletedTask;
     }
 
     protected void OnProjektPicked(Projekt? p)
@@ -448,6 +472,7 @@ public partial class Aufgabenseite : ComponentBase
 
     protected void OnBearbeiterSelected(Benutzer? b)
     {
+        // Nur Projektleiter dürfen die Zuordnung ändern
         if (!isProjektleiter) return;
         if (b == null) return;
         editModel.BenutzerId = b.Id;
