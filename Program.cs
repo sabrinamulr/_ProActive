@@ -53,6 +53,7 @@ builder.Services.AddScoped<IAufgabenService, AufgabenService>();
 builder.Services.AddScoped<IProjekteService, ProjekteService>();
 builder.Services.AddScoped<IVormerkungService, VormerkungService>();
 builder.Services.AddScoped<IKantineWeekService, KantineWeekService>();
+builder.Services.AddScoped<AufgabenSessionState>();
 
 // Session 
 builder.Services.AddDistributedMemoryCache();

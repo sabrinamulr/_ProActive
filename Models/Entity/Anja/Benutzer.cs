@@ -42,5 +42,9 @@ namespace ProActive2508.Models.Entity.Anja
 
         [InverseProperty(nameof(Projekt.Auftraggeber))]
         public ICollection<Projekt> ProjekteAlsAuftraggeber { get; set; } = new List<Projekt>();
+
+        // m:n Benutzer <-> Projekt via ProjektBenutzer
+        [InverseProperty(nameof(Models.Entity.Anja.ProjektBenutzer.Benutzer))]
+        public ICollection<ProjektBenutzer> ProjektBenutzer { get; set; } = new List<ProjektBenutzer>();
     }
 }

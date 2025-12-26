@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.JSInterop;
 using ProActive2508.Data;
 using ProActive2508.Models.Entity.Anja;
+using ProActive2508.Service;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -21,6 +22,7 @@ public partial class Aufgabenseite : ComponentBase
     [Inject] private AppDbContext Db { get; set; } = default!;
     [Inject] private AuthenticationStateProvider Auth { get; set; } = default!;
     [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private AufgabenSessionState SessionState { get; set; } = default!;
 
     protected bool isLoading = true;
     protected bool isModalOpen = false;
@@ -53,7 +55,6 @@ public partial class Aufgabenseite : ComponentBase
     protected List<Projekt> projektChoicesForModal = new List<Projekt>();
     protected string projektSearch = string.Empty;
 
-    protected List<Benutzer> benutzerChoices = new List<Benutzer>();
     protected List<Benutzer> benutzerChoicesForModal = new List<Benutzer>();
     protected string bearbeiterSearch = string.Empty;
 
@@ -119,10 +120,31 @@ public partial class Aufgabenseite : ComponentBase
                 projekteAlsLeiter = new List<Projekt>();
             }
 
+            List<Projekt> relevanteProjekte;
+            if (isProjektleiter)
+            {
+                relevanteProjekte = await Db.Set<Projekt>()
+                    .Where(p => p.BenutzerId == CurrentUserId || p.ProjektleiterId == CurrentUserId)
+                    .OrderBy(p => p.Projektbeschreibung)
+                    .ToListAsync();
+            }
+            else
+            {
+                relevanteProjekte = await Db.Set<Projekt>()
+                    .Where(p => p.BenutzerId == CurrentUserId)
+                    .OrderBy(p => p.Projektbeschreibung)
+                    .ToListAsync();
+            }
+
+            List<int> relevanteProjektIds = relevanteProjekte.Select(p => p.Id).ToList();
+
             // Meine Aufgaben
             meineAufgaben = await Db.Set<Aufgabe>()
                 .AsNoTracking()
-                .Where(a => a.BenutzerId == CurrentUserId)
+                .Where(a => a.BenutzerId == CurrentUserId
+                    && (!a.ProjektId.HasValue
+                        || a.ProjektId.Value == 0
+                        || relevanteProjektIds.Contains(a.ProjektId.Value)))
                 .OrderBy(a => a.Faellig)
                 .ToListAsync();
 
@@ -186,13 +208,18 @@ public partial class Aufgabenseite : ComponentBase
             // Projekt-Filterlisten
             if (isProjektleiter)
             {
-                projektFilterListMeine = projekteAlsLeiter.ToList();
-                projektFilterListZuweisungen = projekteAlsLeiter.ToList();
+                List<Projekt> relevante = await Db.Set<Projekt>()
+                    .Where(p => p.BenutzerId == CurrentUserId || p.ProjektleiterId == CurrentUserId)
+                    .OrderBy(p => p.Projektbeschreibung)
+                    .ToListAsync();
+
+                projektFilterListMeine = relevante.ToList();
+                projektFilterListZuweisungen = relevante.ToList();
             }
             else
             {
                 projektFilterListMeine = await Db.Set<Projekt>()
-                    .Where(p => projektIds.Contains(p.Id))
+                    .Where(p => p.BenutzerId == CurrentUserId)
                     .OrderBy(p => p.Projektbeschreibung)
                     .ToListAsync();
 
@@ -204,46 +231,27 @@ public partial class Aufgabenseite : ComponentBase
 
             if (isProjektleiter)
             {
-                projektChoicesForModal = new List<Projekt> { keinProjekt };
-                projektChoicesForModal.AddRange(projekteAlsLeiter);
-            }
-            else
-            {
-                List<Projekt> alle = await Db.Set<Projekt>()
+                List<Projekt> relevante = await Db.Set<Projekt>()
+                    .Where(p => p.BenutzerId == CurrentUserId || p.ProjektleiterId == CurrentUserId)
                     .OrderBy(p => p.Projektbeschreibung)
                     .ToListAsync();
 
                 projektChoicesForModal = new List<Projekt> { keinProjekt };
-                projektChoicesForModal.AddRange(alle);
-            }
-
-            // Benutzer-Auswahl (Modal)
-            benutzerChoices = benutzerMails
-                .Select(b => new Benutzer { Id = b.Id, Email = b.Email ?? string.Empty })
-                .ToList();
-
-            Benutzer? me = benutzerChoices.FirstOrDefault(b => b.Id == CurrentUserId);
-            if (me == null)
-            {
-                benutzerChoices.Insert(0, new Benutzer { Id = CurrentUserId, Email = CurrentUserEmail });
+                projektChoicesForModal.AddRange(relevante);
             }
             else
             {
-                benutzerChoices.Remove(me);
-                benutzerChoices.Insert(0, me);
+                List<Projekt> relevante = await Db.Set<Projekt>()
+                    .Where(p => p.BenutzerId == CurrentUserId)
+                    .OrderBy(p => p.Projektbeschreibung)
+                    .ToListAsync();
+
+                projektChoicesForModal = new List<Projekt> { keinProjekt };
+                projektChoicesForModal.AddRange(relevante);
             }
 
-            if (isProjektleiter)
-            {
-                benutzerChoicesForModal = benutzerChoices.ToList();
-            }
-            else
-            {
-                benutzerChoicesForModal = new List<Benutzer>
-                {
-                    new Benutzer { Id = CurrentUserId, Email = CurrentUserEmail }
-                };
-            }
+            // Benutzer-Auswahl (Modal) - Default immer "Ich", Projektleiter-Logik bei Projektauswahl
+            SetBearbeiterToCurrentUser();
         }
         catch (Exception ex)
         {
@@ -277,14 +285,17 @@ public partial class Aufgabenseite : ComponentBase
 
         if (!showDone)
         {
-            q = q.Where(a => a.Erledigt != Erledigungsstatus.Erledigt);
+            q = q.Where(a => a.Erledigt != Erledigungsstatus.Erledigt
+                || SessionState.MarkedDoneIds.Contains(a.Id));
         }
 
         q = statusFilter switch
         {
             "Offen" => q.Where(a => a.Erledigt == Erledigungsstatus.Offen),
-            "InBearbeitung" => q.Where(a => a.Erledigt == Erledigungsstatus.InBearbeitung),
-            "Erledigt" => q.Where(a => a.Erledigt == Erledigungsstatus.Erledigt),
+            "InBearbeitung" => q.Where(a => a.Erledigt == Erledigungsstatus.InBearbeitung
+                || a.Erledigt == Erledigungsstatus.Offen),
+            "Erledigt" => q.Where(a => a.Erledigt == Erledigungsstatus.Erledigt
+                || a.Erledigt == Erledigungsstatus.Offen),
             _ => q
         };
 
@@ -328,6 +339,8 @@ public partial class Aufgabenseite : ComponentBase
                 ProjektId = null
             };
 
+            SetBearbeiterToCurrentUser();
+
             modalTitle = "Neue Aufgabe";
             isModalOpen = true;
             StateHasChanged();
@@ -359,6 +372,7 @@ public partial class Aufgabenseite : ComponentBase
 
             modalTitle = $"Aufgabe #{id} bearbeiten";
             isModalOpen = true;
+            await RefreshBearbeiterChoicesAsync(editModel.ProjektId);
             StateHasChanged();
         }
         catch (Exception ex)
@@ -435,7 +449,12 @@ public partial class Aufgabenseite : ComponentBase
         if (row.Erledigt == neuerStatus) return;
 
         Erledigungsstatus alterStatus = row.Erledigt;
+        bool wasInSession = SessionState.MarkedDoneIds.Contains(row.Id);
         row.Erledigt = neuerStatus;
+        if (neuerStatus == Erledigungsstatus.Erledigt)
+            SessionState.MarkedDoneIds.Add(row.Id);
+        else
+            SessionState.MarkedDoneIds.Remove(row.Id);
         StateHasChanged();
 
         try
@@ -450,6 +469,10 @@ public partial class Aufgabenseite : ComponentBase
         catch (Exception ex)
         {
             row.Erledigt = alterStatus;
+            if (wasInSession)
+                SessionState.MarkedDoneIds.Add(row.Id);
+            else
+                SessionState.MarkedDoneIds.Remove(row.Id);
             uiError = "Konnte Status nicht speichern: " + Short(ex);
             StateHasChanged();
         }
@@ -465,9 +488,10 @@ public partial class Aufgabenseite : ComponentBase
         return Task.CompletedTask;
     }
 
-    protected void OnProjektPicked(Projekt? p)
+    protected async Task OnProjektPicked(Projekt? p)
     {
         editModel.ProjektId = (p == null || p.Id <= 0) ? (int?)null : p.Id;
+        await RefreshBearbeiterChoicesAsync(editModel.ProjektId);
     }
 
     protected void OnBearbeiterSelected(Benutzer? b)
@@ -476,6 +500,66 @@ public partial class Aufgabenseite : ComponentBase
         if (!isProjektleiter) return;
         if (b == null) return;
         editModel.BenutzerId = b.Id;
+    }
+
+    private string GetBenutzerLabel(Benutzer b)
+    {
+        string email = string.IsNullOrWhiteSpace(b.Email) ? "User" : b.Email;
+        return b.Id == CurrentUserId ? $"Ich ({email})" : $"{email} (Id:{b.Id})";
+    }
+
+    private void SetBearbeiterToCurrentUser()
+    {
+        editModel.BenutzerId = CurrentUserId;
+        benutzerChoicesForModal = new List<Benutzer>
+        {
+            new Benutzer { Id = CurrentUserId, Email = CurrentUserEmail }
+        };
+        bearbeiterSearch = GetBenutzerLabel(benutzerChoicesForModal[0]);
+    }
+
+    private async Task RefreshBearbeiterChoicesAsync(int? projektId)
+    {
+        if (!isProjektleiter || !projektId.HasValue || projektId.Value <= 0)
+        {
+            SetBearbeiterToCurrentUser();
+            return;
+        }
+
+        var projekt = await Db.Set<Projekt>()
+            .AsNoTracking()
+            .Where(p => p.Id == projektId.Value)
+            .Select(p => new { p.Id, p.ProjektleiterId, p.BenutzerId })
+            .FirstOrDefaultAsync();
+
+        if (projekt == null || projekt.ProjektleiterId != CurrentUserId)
+        {
+            SetBearbeiterToCurrentUser();
+            return;
+        }
+
+        List<int> benutzerIds = await Db.Set<ProjektBenutzer>()
+            .AsNoTracking()
+            .Where(pb => pb.ProjektId == projektId.Value)
+            .Select(pb => pb.BenutzerId)
+            .Distinct()
+            .ToListAsync();
+
+        if (!benutzerIds.Contains(CurrentUserId))
+        {
+            benutzerIds.Add(CurrentUserId);
+        }
+
+        List<Benutzer> benutzer = await Db.Set<Benutzer>()
+            .AsNoTracking()
+            .Where(b => benutzerIds.Contains(b.Id))
+            .Select(b => new Benutzer { Id = b.Id, Email = b.Email ?? string.Empty })
+            .OrderBy(b => b.Email)
+            .ToListAsync();
+
+        benutzerChoicesForModal = benutzer;
+        editModel.BenutzerId = 0;
+        bearbeiterSearch = string.Empty;
     }
 
     protected string GetRowClass(Aufgabe a)

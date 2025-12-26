@@ -16,6 +16,7 @@ namespace ProActive2508.Data
         public DbSet<Benutzer> Benutzer { get; set; } = default!;
         public DbSet<Projekt> Projekte { get; set; } = default!;
         public DbSet<Aufgabe> Aufgaben { get; set; } = default!;
+        public DbSet<ProjektBenutzer> ProjektBenutzer { get; set; } = default!;
 
 
 
@@ -78,6 +79,23 @@ namespace ProActive2508.Data
                 p.HasIndex(x => x.ProjektleiterId);
                 p.HasIndex(x => x.AuftraggeberId);
                 p.HasIndex(x => new { x.Status, x.Phase });
+            });
+
+            // =========================
+            // Anja: PROJEKT_BENUTZER (m:n)
+            // =========================
+            modelBuilder.Entity<ProjektBenutzer>(pb =>
+            {
+                pb.ToTable("ProjektBenutzer");
+                pb.HasKey(x => new { x.ProjektId, x.BenutzerId });
+                pb.HasOne(x => x.Projekt)
+                    .WithMany(p => p.ProjektBenutzer)
+                    .HasForeignKey(x => x.ProjektId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                pb.HasOne(x => x.Benutzer)
+                    .WithMany(b => b.ProjektBenutzer)
+                    .HasForeignKey(x => x.BenutzerId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // =========================
