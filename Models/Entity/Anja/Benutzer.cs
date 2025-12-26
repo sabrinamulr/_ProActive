@@ -28,7 +28,7 @@ namespace ProActive2508.Models.Entity.Anja
         [Required, MaxLength(200)]
         public string PasswordHash { get; set; } = string.Empty;
 
-        // --- Navigationen ---
+       
         // 1:n Benutzer -> Aufgaben (BenutzerId in Aufgabe)
         [InverseProperty(nameof(Aufgabe.Benutzer))]
         public ICollection<Aufgabe> Aufgaben { get; set; } = new List<Aufgabe>();

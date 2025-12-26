@@ -16,6 +16,10 @@ namespace ProActive2508.Data
         public DbSet<Benutzer> Benutzer { get; set; } = default!;
         public DbSet<Projekt> Projekte { get; set; } = default!;
         public DbSet<Aufgabe> Aufgaben { get; set; } = default!;
+
+
+
+
         //public DbSet<AbhakVormerkung> Vormerkungen { get; set; } = default!;
 
         // --- DbSets (Kantine) ---

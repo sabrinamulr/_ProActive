@@ -17,12 +17,12 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
 {
     public partial class KantineWoche : ComponentBase, IDisposable
     {
-        [Parameter] public int? AusgewählteWoche { get; set; }
+        [Parameter] public int? numerischeRoutenZahl { get; set; }
 
         [Inject] public IKantineWeekService WeekService { get; set; } = default!;
         [Inject] public NavigationManager Nav { get; set; } = default!;
         [Inject] public AuthenticationStateProvider Auth { get; set; } = default!;
-        [Inject] public AppDbContext Db { get; set; } = default!; // für „große“ Operationen wie Speichern/Zähler
+        [Inject] public AppDbContext Db { get; set; } = default!; 
         [Inject] public IDbContextFactory<AppDbContext> DbFactory { get; set; } = default!; // für parallele Kurz-Events
         [Inject] public IJSRuntime JS { get; set; } = default!;
         [Inject] public IMenuplanPdfService PdfService { get; set; } = default!;
@@ -51,47 +51,9 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
 
         private bool _commitBusy;
 
-        protected override void OnInitialized()
-        {
-            Nav.LocationChanged += HandleLocationChanged;
-        }
-
-        private async void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
-        {
-            IsEditMode = false;
-            welchewoche = ResolveWelcheWocheFromRoute(AusgewählteWoche, e.Location);
-
-            Title = (welchewoche == 0 ? "Diese Woche"
-                   : (welchewoche == 1 ? "Nächste Woche"
-                   : (welchewoche == 2 ? "In 2 Wochen" : $"In {welchewoche} Wochen")));
-
-            await LoadAsync();
-            await InvokeAsync(StateHasChanged);
-        }
-
-        private int ResolveWelcheWocheFromRoute(int? pOffset, string uri)
-        {
-            if (pOffset.HasValue) return pOffset.Value;
-
-            string path = new Uri(uri).AbsolutePath.Trim('/').ToLowerInvariant();
-
-            if (path.EndsWith("diesewoche")) return 0;
-            if (path.EndsWith("naechstewoche")) return 1;
-            if (path.EndsWith("in2wochen")) return 2;
-
-            string[] seg = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (seg.Length >= 2 && seg[^2] == "kantine")
-            {
-                int parsed;
-                if (int.TryParse(seg[^1], out parsed)) return parsed;
-            }
-
-            return 0;
-        }
-
         protected override async Task OnParametersSetAsync()
         {
-            welchewoche = ResolveWelcheWocheFromRoute(AusgewählteWoche, Nav.Uri);
+            welchewoche = ResolveWelcheWocheFromRoute(numerischeRoutenZahl, Nav.Uri);
 
             Title = (welchewoche == 0 ? "Diese Woche"
                    : (welchewoche == 1 ? "Nächste Woche"
@@ -113,7 +75,27 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
 
             await LoadAsync();
         }
+        private int ResolveWelcheWocheFromRoute(int? zahlenendung, string uri)
+        {
+            if (zahlenendung.HasValue) return zahlenendung.Value;
 
+            string path = new Uri(uri).AbsolutePath.Trim('/').ToLowerInvariant();
+
+            if (path.EndsWith("diesewoche")) return 0;
+            if (path.EndsWith("naechstewoche")) return 1;
+            if (path.EndsWith("in2wochen")) return 2;
+
+            string[] seg = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+
+            if (seg.Length >= 2 && seg[^2] == "kantine")
+            {
+                int parsed;
+                if (int.TryParse(seg[^1], out parsed)) return parsed;
+            }
+
+            return 0;
+        }
         private async Task LoadAsync()
         {
             Loading = true;
@@ -149,14 +131,14 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
                     .Select((IGrouping<int, Vorbestellung> g) => new { Key = g.Key, Cnt = g.Count() })
                     .ToDictionaryAsync(x => x.Key, x => x.Cnt);
 
-                List<int> myIds = await Db.Vorbestellungen
-                    .Where((Vorbestellung v) => v.BenutzerId == CurrentUserId && eintragIds.Contains(v.EintragId))
-                    .Select((Vorbestellung v) => v.EintragId)
-                    .ToListAsync();
-
-                MeineVormerkungen = myIds.ToHashSet();
+                MeineVormerkungen = await Db.Vorbestellungen
+                    .Where(v => v.BenutzerId == CurrentUserId && eintragIds.Contains(v.EintragId))
+                    .Select(v => v.EintragId)
+                    .ToHashSetAsync();//anders als liste erlaubt HashSet keine duplikate keine doppelte auswahl von Menüs erlaubt
 
                 WochenFormular.Clear();
+
+                
             }
             else
             {
@@ -165,6 +147,30 @@ namespace ProActive2508.Components.Pages.Anja.KantinenTeil
 
             Loading = false;
         }
+
+        protected override void OnInitialized()
+        {
+            Nav.LocationChanged += HandleLocationChanged;
+        }
+
+        private async void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+        {
+            IsEditMode = false;
+            welchewoche = ResolveWelcheWocheFromRoute(numerischeRoutenZahl, e.Location);
+
+            Title = (welchewoche == 0 ? "Diese Woche"
+                   : (welchewoche == 1 ? "Nächste Woche"
+                   : (welchewoche == 2 ? "In 2 Wochen" : $"In {welchewoche} Wochen")));
+
+            await LoadAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+
+        
+
+       
+        
+        
 
         protected int GetCount(int eintragId)
         {

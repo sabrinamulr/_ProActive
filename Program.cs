@@ -14,39 +14,25 @@ using QuestPDF.Infrastructure;
 using System.Security.Claims;
 
 
-//Anja Test 30.10
-
-//Test 2 Aja
-
-
-
-
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ===================== DB =====================
-//test test test
-// Nur die Factory registrieren → vermeidet Lifetime-Konflikte.
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Optional: AppDbContext weiterhin injizierbar machen (kommt intern aus der Factory).
 builder.Services.AddScoped<AppDbContext>(sp =>
     sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
 
 QuestPDF.Settings.License = LicenseType.Community;
 builder.Services.AddSingleton<IMenuplanPdfService, MenuplanPdfService>();
 
-// ===================== Auth (Cookies) =====================
+// Cookies
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>
     {
         opt.Cookie.Name = ".ProActive.Auth";
         opt.LoginPath = "/auth/login";
         opt.AccessDeniedPath = "/auth/denied";
-
-        // WICHTIG: kein persistent Cookie erzwingen
-        // (ExpireTimeSpan/SlidingExpiration wirken nur bei persistenten Cookies).
         opt.ExpireTimeSpan = TimeSpan.FromHours(8);
         opt.SlidingExpiration = true;
     });
@@ -58,24 +44,24 @@ builder.Services.AddHttpContextAccessor();
 // Passwort-Hasher
 builder.Services.AddScoped<IPasswordHasher<Benutzer>, PasswordHasher<Benutzer>>();
 
-// Razor Components (Interactive Server)
+// Razor Components
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(o => { o.DetailedErrors = true; });
 
-// ====== eigene Services ======
+// eigene Services
 builder.Services.AddScoped<IAufgabenService, AufgabenService>();
 builder.Services.AddScoped<IProjekteService, ProjekteService>();
 builder.Services.AddScoped<IVormerkungService, VormerkungService>();
 builder.Services.AddScoped<IKantineWeekService, KantineWeekService>();
 
-// ===================== Session (erzwingt Re-Login nach Browser/Tab-Schließen) =====================
+// Session 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
-    options.IdleTimeout = TimeSpan.FromHours(8);      // passend zu deiner Auth-Lebenszeit
+    options.IdleTimeout = TimeSpan.FromHours(8);      
     options.Cookie.HttpOnly = true;
-    options.Cookie.IsEssential = true;                // keine Consent-Pflicht
-    // Session-Cookie ist NICHT persistent → wird beim Schließen typischerweise verworfen.
+    options.Cookie.IsEssential = true;                
+   
 });
 
 var app = builder.Build();
@@ -291,6 +277,7 @@ using (var scope = app.Services.CreateScope())
 // ===========================================
 
 // ======== AUTH ENDPOINTS ========
+
 app.MapPost("/auth/login", async (
     HttpContext http,
     IAntiforgery antiforgery,
