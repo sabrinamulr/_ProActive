@@ -21,13 +21,12 @@ namespace ProActive2508.Service
 
         public async Task<List<Aufgabe>> GetZuweisungenVonLeiterAsync(int projektleiterId, CancellationToken ct = default)
         {
-            // Aufgaben, die der Leiter an andere vergeben hat (ErstellVon = ich, Bearbeiter != ich) und in Projekten, die ich leite
-            var q = from a in _db.Aufgaben.AsNoTracking()
-                    join p in _db.Projekte.AsNoTracking() on a.ProjektId equals p.Id
-                    where a.ErstellVon == projektleiterId && a.BenutzerId != projektleiterId && p.ProjektleiterId == projektleiterId
-                    orderby a.Faellig, a.Id
-                    select a;
-            return await q.ToListAsync(ct);
+            // Aufgaben, die der Leiter erstellt hat (ErstellVon = ich)
+            return await _db.Aufgaben.AsNoTracking()
+                .Where(a => a.ErstellVon == projektleiterId)
+                .OrderBy(a => a.Faellig)
+                .ThenBy(a => a.Id)
+                .ToListAsync(ct);
         }
 
         public Task<Aufgabe?> GetByIdAsync(int id, CancellationToken ct = default)

@@ -108,10 +108,11 @@ public partial class Aufgabenseite : ComponentBase
             // ✅ NUR Rolle entscheidet
             isProjektleiter = user.IsInRole("Projektleiter");
 
-            // Projekte laden (Projektleiter: alle, sonst: später projektIds-abhängig)
+            // Projekte laden (Projektleiter: eigene Projekte, sonst: später projektIds-abhängig)
             if (isProjektleiter)
             {
                 projekteAlsLeiter = await Db.Set<Projekt>()
+                    .Where(p => p.ProjektleiterId == CurrentUserId)
                     .OrderBy(p => p.Projektbeschreibung)
                     .ToListAsync();
             }
@@ -148,27 +149,14 @@ public partial class Aufgabenseite : ComponentBase
                 .OrderBy(a => a.Faellig)
                 .ToListAsync();
 
-            // Zuweisungen von mir (nur Projektleiter)
+            // Zuweisungen von mir (nur Projektleiter, ErstellVon == CurrentUserId, ohne Selbstzuweisung)
             if (isProjektleiter)
             {
-                IQueryable<Aufgabe> q = Db.Set<Aufgabe>().AsNoTracking();
-
-                if (HasProperty<Aufgabe>("ErstellerId"))
-                {
-                    q = q.Where(a => EF.Property<int>(a, "ErstellerId") == CurrentUserId);
-                }
-                else if (HasProperty<Aufgabe>("ZuweiserId"))
-                {
-                    q = q.Where(a => EF.Property<int>(a, "ZuweiserId") == CurrentUserId);
-                }
-                else
-                {
-                    // Fallback: alle Aufgaben in Projekten, die ich leite (wenn du das NICHT willst, entferne diesen Block)
-                    List<int> leitProjIds = projekteAlsLeiter.Select(p => p.Id).ToList();
-                    q = q.Where(a => a.ProjektId.HasValue && leitProjIds.Contains(a.ProjektId.Value));
-                }
-
-                zuweisungenVonMir = await q.OrderBy(a => a.Faellig).ToListAsync();
+                zuweisungenVonMir = await Db.Set<Aufgabe>()
+                    .AsNoTracking()
+                    .Where(a => a.ErstellVon == CurrentUserId && a.BenutzerId != CurrentUserId)
+                    .OrderBy(a => a.Faellig)
+                    .ToListAsync();
             }
             else
             {
@@ -315,14 +303,14 @@ public partial class Aufgabenseite : ComponentBase
     protected string GetProjektTextSafe(int? projektId)
     {
         if (!projektId.HasValue || projektId.Value <= 0) return string.Empty;
-        if (projektLookup.TryGetValue(projektId.Value, out string name)) return name;
+        if (projektLookup.TryGetValue(projektId.Value, out string? name)) return name ?? string.Empty;
         return string.Empty;
     }
 
     protected string GetProjektTextSafe(int projektId)
     {
         if (projektId <= 0) return string.Empty;
-        if (projektLookup.TryGetValue(projektId, out string name)) return name;
+        if (projektLookup.TryGetValue(projektId, out string? name)) return name ?? string.Empty;
         return string.Empty;
     }
 
@@ -384,6 +372,7 @@ public partial class Aufgabenseite : ComponentBase
     protected void CloseModal()
     {
         isModalOpen = false;
+        ResetModalDefaults();
     }
 
     protected async Task SaveAsync()
@@ -431,6 +420,7 @@ public partial class Aufgabenseite : ComponentBase
             await Db.SaveChangesAsync();
 
             isModalOpen = false;
+            ResetModalDefaults();
             await LoadAsync();
         }
         catch (DbUpdateException ex)
@@ -448,31 +438,30 @@ public partial class Aufgabenseite : ComponentBase
         Erledigungsstatus neuerStatus = isChecked ? Erledigungsstatus.Erledigt : Erledigungsstatus.Offen;
         if (row.Erledigt == neuerStatus) return;
 
-        Erledigungsstatus alterStatus = row.Erledigt;
-        bool wasInSession = SessionState.MarkedDoneIds.Contains(row.Id);
-        row.Erledigt = neuerStatus;
-        if (neuerStatus == Erledigungsstatus.Erledigt)
-            SessionState.MarkedDoneIds.Add(row.Id);
-        else
-            SessionState.MarkedDoneIds.Remove(row.Id);
-        StateHasChanged();
-
         try
         {
-            Aufgabe stub = new Aufgabe { Id = row.Id };
-            Db.Attach(stub);
-            Db.Entry(stub).Property(a => a.Erledigt).CurrentValue = neuerStatus;
-            Db.Entry(stub).Property(a => a.Erledigt).IsModified = true;
+            var tracked = Db.ChangeTracker.Entries<Aufgabe>()
+                .FirstOrDefault(e => e.Entity.Id == row.Id)
+                ?.Entity;
+
+            var target = tracked ?? row;
+            if (tracked == null)
+                Db.Attach(target);
+
+            Db.Entry(target).Property(a => a.Erledigt).CurrentValue = neuerStatus;
+            Db.Entry(target).Property(a => a.Erledigt).IsModified = true;
 
             await Db.SaveChangesAsync();
-        }
-        catch (Exception ex)
-        {
-            row.Erledigt = alterStatus;
-            if (wasInSession)
+
+            row.Erledigt = neuerStatus;
+            if (neuerStatus == Erledigungsstatus.Erledigt)
                 SessionState.MarkedDoneIds.Add(row.Id);
             else
                 SessionState.MarkedDoneIds.Remove(row.Id);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
             uiError = "Konnte Status nicht speichern: " + Short(ex);
             StateHasChanged();
         }
@@ -516,6 +505,23 @@ public partial class Aufgabenseite : ComponentBase
             new Benutzer { Id = CurrentUserId, Email = CurrentUserEmail }
         };
         bearbeiterSearch = GetBenutzerLabel(benutzerChoicesForModal[0]);
+    }
+
+    private void ResetModalDefaults()
+    {
+        editModel = new Aufgabe
+        {
+            BenutzerId = CurrentUserId,
+            ErstellVon = CurrentUserId,
+            Faellig = DateTime.Today.AddDays(7),
+            Erledigt = Erledigungsstatus.Offen,
+            ProjektId = null
+        };
+
+        projektSearch = string.Empty;
+        bearbeiterSearch = string.Empty;
+        SetBearbeiterToCurrentUser();
+        modalTitle = string.Empty;
     }
 
     private async Task RefreshBearbeiterChoicesAsync(int? projektId)
