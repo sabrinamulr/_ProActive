@@ -17,6 +17,9 @@ namespace ProActive2508.Data
         public DbSet<Projekt> Projekte { get; set; } = default!;
         public DbSet<Aufgabe> Aufgaben { get; set; } = default!;
         public DbSet<ProjektBenutzer> ProjektBenutzer { get; set; } = default!;
+        public DbSet<UmfrageKategorie> UmfrageKategorien { get; set; } = default!;
+        public DbSet<Frage> Fragen { get; set; } = default!;
+        public DbSet<Antwort> Antworten { get; set; } = default!;
 
 
 
@@ -146,6 +149,60 @@ namespace ProActive2508.Data
                 a.HasIndex(x => x.ProjektId);
                 a.HasIndex(x => x.BenutzerId);
                 a.HasIndex(x => new { x.Phase, x.Faellig });
+            });
+
+            // =========================
+            // Anja: UMFRAGEKATEGORIE
+            // =========================
+            modelBuilder.Entity<UmfrageKategorie>(k =>
+            {
+                k.ToTable("UmfrageKategorie");
+                k.Property(x => x.Id).ValueGeneratedOnAdd();
+                k.Property(x => x.Name)
+                    .HasMaxLength(200)
+                    .IsUnicode(false)
+                    .IsRequired();
+                k.ToTable(tb => tb.HasCheckConstraint("CK_UmfrageKategorie_Name_NotEmpty", "LEN([Name]) > 0"));
+            });
+
+            // =========================
+            // Anja: FRAGE
+            // =========================
+            modelBuilder.Entity<Frage>(f =>
+            {
+                f.ToTable("Frage");
+                f.Property(x => x.Id).ValueGeneratedOnAdd();
+                f.Property(x => x.Text).IsUnicode(false);
+
+                f.HasOne(x => x.Kategorie)
+                    .WithMany(k => k.Fragen)
+                    .HasForeignKey(x => x.KategorieId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                f.HasIndex(x => x.KategorieId);
+            });
+
+            // =========================
+            // Anja: ANTWORT
+            // =========================
+            modelBuilder.Entity<Antwort>(a =>
+            {
+                a.ToTable("Antwort");
+                a.Property(x => x.Id).ValueGeneratedOnAdd();
+                a.Property(x => x.Datum).HasColumnType("date");
+
+                a.HasOne(x => x.Frage)
+                    .WithMany(f => f.Antworten)
+                    .HasForeignKey(x => x.FrageId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                a.HasOne(x => x.Projekt)
+                    .WithMany(p => p.Antworten)
+                    .HasForeignKey(x => x.ProjektId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                a.HasIndex(x => x.FrageId);
+                a.HasIndex(x => x.ProjektId);
             });
 
 
