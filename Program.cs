@@ -26,6 +26,8 @@ builder.Services.AddScoped<AppDbContext>(sp =>
 QuestPDF.Settings.License = LicenseType.Community;
 builder.Services.AddSingleton<IMenuplanPdfService, MenuplanPdfService>();
 
+builder.Services.AddScoped<Umfrage>();
+
 // Cookies
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>
