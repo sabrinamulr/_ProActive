@@ -1,22 +1,26 @@
-﻿@page "/feedback-lisa"
+﻿@page "/feedback-lisa/{ProjektId:int}"
 @namespace ProActive2508.Components.Pages.Lisa
 @rendermode InteractiveServer
 
 @using ProActive2508.Models.Entity.Anja
 @using ProActive2508.Service
 @using ProActive2508.Data
+@using Microsoft.EntityFrameworkCore
 @inject Umfrage FeedbackService
 @inject AppDbContext _context
+@inject NavigationManager Nav
 
 <h2>Projektfeedback</h2>
 
 @if (!string.IsNullOrEmpty(StatusMessage))
 {
-    <p style="color: green; font-weight: bold;">@StatusMessage</p>
+    <p style="color: red; font-weight: bold;">@StatusMessage</p>
 }
 
-@foreach (var category in Kategorien)
+@if (Kategorien.Count > 0)
 {
+    var category = Kategorien[AktuelleKategorieIndex];
+
     <h3>@category.Name</h3>
 
     <div class="category-box">
@@ -35,11 +39,31 @@
             </div>
         }
     </div>
-}
 
-<button class="btn btn-primary" @onclick="SubmitFeedback">
-    Feedback absenden
-</button>
+    <div class="button-row">
+        @if (AktuelleKategorieIndex > 0)
+        {
+            <button class="btn btn-secondary me-2" @onclick="Zurueck">
+                Zurück
+            </button>
+        }
+
+        @if (AktuelleKategorieIndex < Kategorien.Count - 1)
+        {
+            <button class="btn btn-primary" @onclick="Weiter">
+                Weiter
+            </button>
+        }
+        else
+        {
+            <button class="btn btn-success"
+                    @onclick="SubmitFeedback"
+                    disabled="@IsSubmitted">
+                Feedback absenden
+            </button>
+        }
+    </div>
+}
 
 <style>
     h2 {
@@ -56,16 +80,34 @@
     .frage {
         margin-bottom: 15px;
     }
+
+    .button-row {
+        margin-top: 20px;
+    }
 </style>
 
 @code {
 
+    [Parameter] public int ProjektId { get; set; }
+
     private string? StatusMessage;
     private List<UmfrageKategorie> Kategorien = new();
-    private Dictionary<int, int> Antworten = new(); // FrageId → Rating
+    private Dictionary<int, int> Antworten = new();
+    private int AktuelleKategorieIndex = 0;
+    private bool IsSubmitted = false;
 
     protected override async Task OnInitializedAsync()
     {
+        // Prüfen, ob dieses Projekt schon Feedback abgegeben hat
+        bool hatFeedback = await _context.Antworten
+            .AnyAsync(f => f.ProjektId == ProjektId);
+
+        if (hatFeedback)
+        {
+            Nav.NavigateTo("/feedback-danke");
+            return;
+        }
+
         try
         {
             Kategorien = await FeedbackService.GetKategorienAsync();
@@ -74,7 +116,7 @@
             {
                 foreach (var frage in kat.Fragen)
                 {
-                    Antworten[frage.Id] = 3; // Startwert
+                    Antworten[frage.Id] = 3;
                 }
             }
         }
@@ -82,6 +124,18 @@
         {
             StatusMessage = "FEHLER in OnInitializedAsync: " + ex.Message;
         }
+    }
+
+    private void Weiter()
+    {
+        if (AktuelleKategorieIndex < Kategorien.Count - 1)
+            AktuelleKategorieIndex++;
+    }
+
+    private void Zurueck()
+    {
+        if (AktuelleKategorieIndex > 0)
+            AktuelleKategorieIndex--;
     }
 
     private void OnSliderChanged(ChangeEventArgs e, int frageId)
@@ -94,13 +148,18 @@
     {
         try
         {
+            if (IsSubmitted)
+                return;
+
+            IsSubmitted = true;
+
             foreach (var kvp in Antworten)
             {
                 var antwort = new Antwort
                 {
                     FrageId = kvp.Key,
                     Rating = kvp.Value,
-                    ProjektId = 1,   // ⭐ statisch
+                    ProjektId = ProjektId,
                     Datum = DateTime.Now
                 };
 
@@ -108,13 +167,12 @@
             }
 
             await _context.SaveChangesAsync();
-
-            StatusMessage = "Feedback erfolgreich gespeichert!";
+            Nav.NavigateTo("/feedback-danke");
         }
         catch (Exception ex)
         {
             StatusMessage = "Fehler beim Speichern: " + ex.Message;
+            IsSubmitted = false;
         }
     }
-
 }

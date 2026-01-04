@@ -151,11 +151,12 @@ using (var scope = app.Services.CreateScope())
         // ---------- Projekte ----------
         var proj = new List<Projekt>
         {
-            new() { BenutzerId = benutzer[0].Id, ProjektleiterId = benutzer[1].Id, AuftraggeberId = benutzer[2].Id, Status = Projektstatus.Aktiv,         Phase = Projektphase.Initialisierung, Projektbeschreibung="VW" },
+            new() { BenutzerId = benutzer[0].Id, ProjektleiterId = benutzer[1].Id, AuftraggeberId = benutzer[2].Id, Status = Projektstatus.Abgeschlossen,         Phase = Projektphase.Umsetzung, Projektbeschreibung="VW" },
             new() { BenutzerId = benutzer[1].Id, ProjektleiterId = benutzer[2].Id, AuftraggeberId = benutzer[3].Id, Status = Projektstatus.Pausiert,      Phase = Projektphase.Planung , Projektbeschreibung="Mazda" },
             new() { BenutzerId = benutzer[2].Id, ProjektleiterId = benutzer[3].Id, AuftraggeberId = benutzer[4].Id, Status = Projektstatus.Abgeschlossen, Phase = Projektphase.Umsetzung, Projektbeschreibung="Audi"  },
-            new() { BenutzerId = benutzer[3].Id, ProjektleiterId = benutzer[4].Id, AuftraggeberId = benutzer[0].Id, Status = Projektstatus.Aktiv,         Phase = Projektphase.Planung , Projektbeschreibung = "Mercedes"},
-            new() { BenutzerId = benutzer[4].Id, ProjektleiterId = benutzer[0].Id, AuftraggeberId = benutzer[1].Id, Status = Projektstatus.Pausiert,      Phase = Projektphase.Umsetzung , Projektbeschreibung = "Seat"}
+            new() { BenutzerId = benutzer[3].Id, ProjektleiterId = benutzer[4].Id, AuftraggeberId = benutzer[0].Id, Status = Projektstatus.Abgeschlossen,         Phase = Projektphase.Planung , Projektbeschreibung = "Mercedes"},
+            new() { BenutzerId = benutzer[4].Id, ProjektleiterId = benutzer[0].Id, AuftraggeberId = benutzer[1].Id, Status = Projektstatus.Pausiert,      Phase = Projektphase.Umsetzung , Projektbeschreibung = "Seat"},
+
         };
         db.Projekte.AddRange(proj);
         await db.SaveChangesAsync();
