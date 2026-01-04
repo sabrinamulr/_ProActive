@@ -1,0 +1,120 @@
+﻿@page "/feedback-lisa"
+@namespace ProActive2508.Components.Pages.Lisa
+@rendermode InteractiveServer
+
+@using ProActive2508.Models.Entity.Anja
+@using ProActive2508.Service
+@using ProActive2508.Data
+@inject Umfrage FeedbackService
+@inject AppDbContext _context
+
+<h2>Projektfeedback</h2>
+
+@if (!string.IsNullOrEmpty(StatusMessage))
+{
+    <p style="color: green; font-weight: bold;">@StatusMessage</p>
+}
+
+@foreach (var category in Kategorien)
+{
+    <h3>@category.Name</h3>
+
+    <div class="category-box">
+        @foreach (var frage in category.Fragen)
+        {
+            <div class="frage">
+                <p>@frage.Text</p>
+
+                <input type="range"
+                       min="1"
+                       max="5"
+                       value="@Antworten[frage.Id]"
+                       @oninput="e => OnSliderChanged(e, frage.Id)" />
+
+                <span class="ms-2 fw-bold">@Antworten[frage.Id]</span>
+            </div>
+        }
+    </div>
+}
+
+<button class="btn btn-primary" @onclick="SubmitFeedback">
+    Feedback absenden
+</button>
+
+<style>
+    h2 {
+        margin-bottom: 20px;
+    }
+
+    .category-box {
+        margin-bottom: 30px;
+        padding: 15px;
+        background: #f5f5f5;
+        border-radius: 8px;
+    }
+
+    .frage {
+        margin-bottom: 15px;
+    }
+</style>
+
+@code {
+
+    private string? StatusMessage;
+    private List<UmfrageKategorie> Kategorien = new();
+    private Dictionary<int, int> Antworten = new(); // FrageId → Rating
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Kategorien = await FeedbackService.GetKategorienAsync();
+
+            foreach (var kat in Kategorien)
+            {
+                foreach (var frage in kat.Fragen)
+                {
+                    Antworten[frage.Id] = 3; // Startwert
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "FEHLER in OnInitializedAsync: " + ex.Message;
+        }
+    }
+
+    private void OnSliderChanged(ChangeEventArgs e, int frageId)
+    {
+        int value = int.Parse(e.Value?.ToString() ?? "3");
+        Antworten[frageId] = value;
+    }
+
+    private async Task SubmitFeedback()
+    {
+        try
+        {
+            foreach (var kvp in Antworten)
+            {
+                var antwort = new Antwort
+                {
+                    FrageId = kvp.Key,
+                    Rating = kvp.Value,
+                    ProjektId = 1,   // ⭐ statisch
+                    Datum = DateTime.Now
+                };
+
+                _context.Antworten.Add(antwort);
+            }
+
+            await _context.SaveChangesAsync();
+
+            StatusMessage = "Feedback erfolgreich gespeichert!";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Fehler beim Speichern: " + ex.Message;
+        }
+    }
+
+}

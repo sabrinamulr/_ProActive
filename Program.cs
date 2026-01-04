@@ -83,6 +83,8 @@ app.UseAuthorization();
 // Middleware, die Tokens erwartet/ausstellt (für <AntiforgeryToken/>)
 app.UseAntiforgery();
 
+
+
 // =============== Re-Login-Erzwingung auf neuer Browsersitzung ===============
 // Wenn Benutzer authentifiziert ist, aber das Session-Flag fehlt (neue Browsersitzung),
 // dann sofort abmelden und auf Login umleiten.
@@ -169,6 +171,75 @@ using (var scope = app.Services.CreateScope())
             new() { ProjektId = proj[4].Id, BenutzerId = benutzer[4].Id, Aufgabenbeschreibung = "Testplan schreiben",    Faellig = new DateTime(2025, 9, 5), Phase = erledigt,       Erledigt = Erledigungsstatus.Erledigt, ErstellVon = benutzer[1].Id  }
         };
         db.Aufgaben.AddRange(aufgaben);
+        await db.SaveChangesAsync();
+    }
+    // ---------- Feedback-Kategorien & Fragen ----------
+    if (!await db.UmfrageKategorien.AnyAsync())
+    {
+        var kategorien = new List<UmfrageKategorie>
+    {
+        new UmfrageKategorie
+        {
+            Name = "Allgemeine Projektzufriedenheit",
+            Fragen = new List<Frage>
+            {
+                new Frage { Text = "Wie zufrieden bist du insgesamt mit dem Projektverlauf?" },
+                new Frage { Text = "Wie zufrieden bist du mit dem Endergebnis des Projekts?" },
+                new Frage { Text = "Wie klar waren die Projektziele für dich?" },
+                new Frage { Text = "Wie gut war die Planung des Projekts?" }
+            }
+        },
+
+        new UmfrageKategorie
+        {
+            Name = "Zusammenarbeit & Teamdynamik",
+            Fragen = new List<Frage>
+            {
+                new Frage { Text = "Wie gut hat die Zusammenarbeit im Projektteam funktioniert?" },
+                new Frage { Text = "Wie gut war die Kommunikation zwischen den Teammitgliedern?" },
+                new Frage { Text = "Wie wertgeschätzt hast du dich im Projekt gefühlt?" },
+                new Frage { Text = "Wie gut wurden Konflikte im Team gelöst?" }
+            }
+        },
+
+        new UmfrageKategorie
+        {
+            Name = "Führung & Projektleitung",
+            Fragen = new List<Frage>
+            {
+                new Frage { Text = "Wie gut war die Kommunikation mit der Projektleitung?" },
+                new Frage { Text = "Wie klar waren die Anweisungen und Erwartungen?" },
+                new Frage { Text = "Wie gut wurden Entscheidungen getroffen und kommuniziert?" },
+                new Frage { Text = "Wie fair wurden Aufgaben verteilt?" }
+            }
+        },
+
+        new UmfrageKategorie
+        {
+            Name = "Prozesse & Abläufe",
+            Fragen = new List<Frage>
+            {
+                new Frage { Text = "Wie gut haben die Arbeitsprozesse funktioniert?" },
+                new Frage { Text = "Wie gut war die Materialversorgung organisiert?" },
+                new Frage { Text = "Wie gut haben Schnittstellen zu anderen Abteilungen funktioniert?" },
+                new Frage { Text = "Wie realistisch waren die Zeitpläne?" }
+            }
+        },
+
+        new UmfrageKategorie
+        {
+            Name = "Belastung & Arbeitsbedingungen",
+            Fragen = new List<Frage>
+            {
+                new Frage { Text = "Wie hoch war deine Arbeitsbelastung während des Projekts?" },
+                new Frage { Text = "Wie gut konntest du Pausen einhalten?" },
+                new Frage { Text = "Wie gut war die körperliche Belastung tragbar?" },
+                new Frage { Text = "Wie gut war die mentale Belastung tragbar?" }
+            }
+        }
+    };
+
+        db.UmfrageKategorien.AddRange(kategorien);
         await db.SaveChangesAsync();
     }
 
