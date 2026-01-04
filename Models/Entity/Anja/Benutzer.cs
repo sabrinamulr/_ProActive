@@ -51,9 +51,9 @@ namespace ProActive2508.Models.Entity.Anja
         [InverseProperty(nameof(ProjektPhase.VerantwortlicherBenutzer))]
         public ICollection<ProjektPhase> ProjektPhasenAlsVerantwortlicher { get; set; } = new List<ProjektPhase>();
 
-        // 1:n Benutzer -> Meilenstein (Genehmiger)
-        [InverseProperty(nameof(Meilenstein.GenehmigerBenutzer))]
-        public ICollection<Meilenstein> GenehmigteMeilensteine { get; set; } = new List<Meilenstein>();
+        // 1:n Benutzer -> PhaseMeilenstein (Genehmiger)
+        [InverseProperty(nameof(PhaseMeilenstein.GenehmigerBenutzer))]
+        public ICollection<PhaseMeilenstein> GenehmigtePhaseMeilensteine { get; set; } = new List<PhaseMeilenstein>();
 
         // 1:n Benutzer -> ProjektPhasenMA
         [InverseProperty(nameof(ProjektPhasenMA.Benutzer))]

@@ -20,6 +20,7 @@ namespace ProActive2508.Data
         public DbSet<ProjektPhase> ProjektPhasen { get; set; } = default!;
         public DbSet<Phase> Phasen { get; set; } = default!;
         public DbSet<Meilenstein> Meilensteine { get; set; } = default!;
+        public DbSet<PhaseMeilenstein> PhaseMeilensteine { get; set; } = default!;
         public DbSet<ProjektPhasenMA> ProjektPhasenMitarbeiter { get; set; } = default!;
         public DbSet<UmfrageKategorie> UmfrageKategorien { get; set; } = default!;
         public DbSet<Frage> Fragen { get; set; } = default!;
@@ -114,6 +115,18 @@ namespace ProActive2508.Data
                 p.Property(x => x.Id).ValueGeneratedOnAdd();
                 p.Property(x => x.Bezeichnung).IsRequired();
                 p.Property(x => x.Kurzbezeichnung).IsRequired();
+
+                p.HasData(
+                    new Phase { Id = 1, Bezeichnung = "Quotation", Kurzbezeichnung = "P0" },
+                    new Phase { Id = 2, Bezeichnung = "Program Preparation and Kick-Off", Kurzbezeichnung = "P1" },
+                    new Phase { Id = 3, Bezeichnung = "Prototype Design", Kurzbezeichnung = "P2" },
+                    new Phase { Id = 4, Bezeichnung = "Production Design", Kurzbezeichnung = "P3" },
+                    new Phase { Id = 5, Bezeichnung = "Off Process Samples", Kurzbezeichnung = "P4" },
+                    new Phase { Id = 6, Bezeichnung = "Customer PPAP Preparation", Kurzbezeichnung = "P5" },
+                    new Phase { Id = 7, Bezeichnung = "Production Launch", Kurzbezeichnung = "P6" },
+                    new Phase { Id = 8, Bezeichnung = "End of Regular Production & Transition to service", Kurzbezeichnung = "P7" },
+                    new Phase { Id = 9, Bezeichnung = "Product Close-Out", Kurzbezeichnung = "P8" }
+                );
             });
 
             // =========================
@@ -158,21 +171,48 @@ namespace ProActive2508.Data
                 m.ToTable("Meilenstein");
                 m.Property(x => x.Id).ValueGeneratedOnAdd();
                 m.Property(x => x.Bezeichnung).IsRequired();
-                m.Property(x => x.Status).IsRequired(false);
-                m.Property(x => x.Erreichtdatum).IsRequired(false);
 
-                m.HasOne(x => x.ProjektPhase)
-                    .WithMany(p => p.Meilensteine)
+                m.HasData(
+                    new Meilenstein { Id = 1, Bezeichnung = "Quotation" },
+                    new Meilenstein { Id = 2, Bezeichnung = "Program Kick-Off" },
+                    new Meilenstein { Id = 3, Bezeichnung = "Prototype Design" },
+                    new Meilenstein { Id = 4, Bezeichnung = "Production Design" },
+                    new Meilenstein { Id = 5, Bezeichnung = "Off Process Tools" },
+                    new Meilenstein { Id = 6, Bezeichnung = "Customer PPAP" },
+                    new Meilenstein { Id = 7, Bezeichnung = "Production Launch" },
+                    new Meilenstein { Id = 8, Bezeichnung = "Productio Transition" },
+                    new Meilenstein { Id = 9, Bezeichnung = "End" }
+                );
+            });
+
+            // =========================
+            // Anja: PHASE_MEILENSTEIN
+            // =========================
+            modelBuilder.Entity<PhaseMeilenstein>(pm =>
+            {
+                pm.ToTable("PhaseMeilenstein");
+                pm.Property(x => x.Id).ValueGeneratedOnAdd();
+                pm.Property(x => x.Status).IsRequired(false);
+                pm.Property(x => x.Erreichtdatum).IsRequired(false);
+
+                pm.HasOne(x => x.ProjektPhase)
+                    .WithMany(p => p.PhaseMeilensteine)
                     .HasForeignKey(x => x.ProjektphasenId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                m.HasOne(x => x.GenehmigerBenutzer)
-                    .WithMany(b => b.GenehmigteMeilensteine)
+                pm.HasOne(x => x.Meilenstein)
+                    .WithMany(m => m.PhaseMeilensteine)
+                    .HasForeignKey(x => x.MeilensteinId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                pm.HasOne(x => x.GenehmigerBenutzer)
+                    .WithMany(b => b.GenehmigtePhaseMeilensteine)
                     .HasForeignKey(x => x.GenehmigerbenutzerId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                m.HasIndex(x => x.ProjektphasenId);
-                m.HasIndex(x => x.GenehmigerbenutzerId);
+                pm.HasIndex(x => x.ProjektphasenId);
+                pm.HasIndex(x => x.MeilensteinId);
+                pm.HasIndex(x => x.GenehmigerbenutzerId);
             });
 
             // =========================
