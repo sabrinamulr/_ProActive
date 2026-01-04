@@ -51,6 +51,7 @@
                         {
                             <span>Projekte</span>
                         }
+
                     </NavLink>
                 </div>
 
@@ -59,11 +60,18 @@
                         <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Profile
                     </NavLink>
                 </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="/feedback-lisa">
-                        <span class="bi bi-chat-left-text" aria-hidden="true"></span> Feedback
-                    </NavLink>
-                </div>
+
+                @if (state.User.IsInRole("Mitarbeiter"))
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/feedback-liste">
+                            <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span>Feedback
+
+                        </NavLink>
+                    </div>
+
+
+                }
 
 
                 <!-- Kantine -->

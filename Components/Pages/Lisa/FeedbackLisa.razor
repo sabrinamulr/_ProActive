@@ -1,7 +1,6 @@
-﻿@page "/feedback-lisa"
+﻿@page "/feedback-lisa/{ProjektId:int}"
 @namespace ProActive2508.Components.Pages.Lisa
 @rendermode InteractiveServer
-
 
 @using ProActive2508.Models.Entity.Anja
 @using ProActive2508.Service
@@ -89,6 +88,8 @@
 
 @code {
 
+    [Parameter] public int ProjektId { get; set; }
+
     private string? StatusMessage;
     private List<UmfrageKategorie> Kategorien = new();
     private Dictionary<int, int> Antworten = new();
@@ -99,7 +100,7 @@
     {
         // Prüfen, ob dieses Projekt schon Feedback abgegeben hat
         bool hatFeedback = await _context.Antworten
-            .AnyAsync(f => f.ProjektId == 1);
+            .AnyAsync(f => f.ProjektId == ProjektId);
 
         if (hatFeedback)
         {
@@ -158,7 +159,7 @@
                 {
                     FrageId = kvp.Key,
                     Rating = kvp.Value,
-                    ProjektId = 1,
+                    ProjektId = ProjektId,
                     Datum = DateTime.Now
                 };
 

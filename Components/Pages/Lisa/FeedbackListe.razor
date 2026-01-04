@@ -1,0 +1,92 @@
+﻿@page "/feedback-liste"
+@using ProActive2508.Data
+@using ProActive2508.Models.Entity.Anja
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext _context
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h2>Feedback abgeben</h2>
+
+@if (isLoading)
+{
+    <p>Lade Projekte…</p>
+}
+else if (projekte is null || !projekte.Any())
+{
+    <div class="alert alert-info">Keine erledigten Projekte gefunden.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Projekt</th>
+                <th>Status</th>
+                <th>Feedback</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in projekte)
+            {
+                <tr>
+                    <td>@p.Projektbeschreibung</td>
+                    <td>@p.Status</td>
+                    <td>
+                        @if (p.Antworten.Any())
+                        {
+                            <span class="text-success fw-bold">Feedback abgegeben</span>
+                        }
+                        else
+                        {
+                            <button class="btn btn-primary"
+                                    @onclick="@(() => StartFeedback(p.Id))">
+                                Feedback abgeben
+                            </button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool isLoading = true;
+    private List<Projekt>? projekte;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (!user.Identity?.IsAuthenticated ?? true)
+        {
+            // nicht eingeloggt → ggf. auf Login leiten oder einfach abbrechen
+            isLoading = false;
+            return;
+        }
+
+        var userIdClaim = user.Claims.FirstOrDefault(c => c.Type.Contains("nameidentifier"));
+        if (userIdClaim == null)
+        {
+            isLoading = false;
+            return;
+        }
+
+        int userId = int.Parse(userIdClaim.Value);
+
+        projekte = await _context.Projekte
+            .Where(p => p.BenutzerId == userId &&
+                        p.Status == Projektstatus.Abgeschlossen)
+            .Include(p => p.Antworten)
+            .ToListAsync();
+
+        isLoading = false;
+    }
+
+    private void StartFeedback(int projektId)
+    {
+        Nav.NavigateTo($"/feedback-lisa/{projektId}");
+    }
+}

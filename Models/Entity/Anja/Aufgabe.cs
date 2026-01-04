@@ -49,6 +49,7 @@ namespace ProActive2508.Models.Entity.Anja
         [ForeignKey(nameof(BenutzerId))]
         [InverseProperty(nameof(Benutzer.Aufgaben))]
         public Benutzer? Benutzer { get; set; }
+
     }
 
     // Feinere Stadien der Bearbeitung

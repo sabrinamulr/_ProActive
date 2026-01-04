@@ -1,0 +1,37 @@
+﻿@page "/feedback-info/{ProjektId:int}"
+@using ProActive2508.Data
+@using ProActive2508.Models.Entity.Anja
+@inject AppDbContext _context
+@inject NavigationManager Nav
+
+<h2>Projekt abgeschlossen</h2>
+
+@if (projekt != null)
+{
+    <p>Projekt: <strong>@projekt.Projektbeschreibung</strong></p>
+    <p>Status: @projekt.Status</p>
+
+    <button class="btn btn-primary"
+            @onclick="StartFeedback">
+        Feedbackrunde starten
+    </button>
+}
+else
+{
+    <p>Projekt wurde nicht gefunden.</p>
+}
+
+@code {
+    [Parameter] public int ProjektId { get; set; }
+    private Projekt? projekt;
+
+    protected override async Task OnInitializedAsync()
+    {
+        projekt = await _context.Projekte.FindAsync(ProjektId);
+    }
+
+    private void StartFeedback()
+    {
+        Nav.NavigateTo($"/feedback-lisa/{ProjektId}");
+    }
+}
