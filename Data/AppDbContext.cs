@@ -17,6 +17,10 @@ namespace ProActive2508.Data
         public DbSet<Projekt> Projekte { get; set; } = default!;
         public DbSet<Aufgabe> Aufgaben { get; set; } = default!;
         public DbSet<ProjektBenutzer> ProjektBenutzer { get; set; } = default!;
+        public DbSet<ProjektPhase> ProjektPhasen { get; set; } = default!;
+        public DbSet<Phase> Phasen { get; set; } = default!;
+        public DbSet<Meilenstein> Meilensteine { get; set; } = default!;
+        public DbSet<ProjektPhasenMA> ProjektPhasenMitarbeiter { get; set; } = default!;
         public DbSet<UmfrageKategorie> UmfrageKategorien { get; set; } = default!;
         public DbSet<Frage> Fragen { get; set; } = default!;
         public DbSet<Antwort> Antworten { get; set; } = default!;
@@ -99,6 +103,100 @@ namespace ProActive2508.Data
                     .WithMany(b => b.ProjektBenutzer)
                     .HasForeignKey(x => x.BenutzerId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // =========================
+            // Anja: PHASE
+            // =========================
+            modelBuilder.Entity<Phase>(p =>
+            {
+                p.ToTable("Phase");
+                p.Property(x => x.Id).ValueGeneratedOnAdd();
+                p.Property(x => x.Bezeichnung).IsRequired();
+                p.Property(x => x.Kurzbezeichnung).IsRequired();
+            });
+
+            // =========================
+            // Anja: PROJEKTPHASE
+            // =========================
+            modelBuilder.Entity<ProjektPhase>(pp =>
+            {
+                pp.ToTable("ProjektPhase");
+                pp.Property(x => x.Id).ValueGeneratedOnAdd();
+
+                pp.Property(x => x.StartDate).IsRequired();
+                pp.Property(x => x.DueDate).IsRequired();
+                pp.Property(x => x.Abschlussdatum).IsRequired(false);
+                pp.Property(x => x.Status).IsRequired(false);
+                pp.Property(x => x.Notizen).IsRequired(false);
+
+                pp.HasOne(x => x.Projekt)
+                    .WithMany(p => p.ProjektPhasen)
+                    .HasForeignKey(x => x.ProjekteId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                pp.HasOne(x => x.Phase)
+                    .WithMany(p => p.ProjektPhasen)
+                    .HasForeignKey(x => x.PhasenId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                pp.HasOne(x => x.VerantwortlicherBenutzer)
+                    .WithMany(b => b.ProjektPhasenAlsVerantwortlicher)
+                    .HasForeignKey(x => x.VerantwortlicherbenutzerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                pp.HasIndex(x => x.ProjekteId);
+                pp.HasIndex(x => x.PhasenId);
+                pp.HasIndex(x => x.VerantwortlicherbenutzerId);
+            });
+
+            // =========================
+            // Anja: MEILENSTEIN
+            // =========================
+            modelBuilder.Entity<Meilenstein>(m =>
+            {
+                m.ToTable("Meilenstein");
+                m.Property(x => x.Id).ValueGeneratedOnAdd();
+                m.Property(x => x.Bezeichnung).IsRequired();
+                m.Property(x => x.Status).IsRequired(false);
+                m.Property(x => x.Erreichtdatum).IsRequired(false);
+
+                m.HasOne(x => x.ProjektPhase)
+                    .WithMany(p => p.Meilensteine)
+                    .HasForeignKey(x => x.ProjektphasenId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                m.HasOne(x => x.GenehmigerBenutzer)
+                    .WithMany(b => b.GenehmigteMeilensteine)
+                    .HasForeignKey(x => x.GenehmigerbenutzerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                m.HasIndex(x => x.ProjektphasenId);
+                m.HasIndex(x => x.GenehmigerbenutzerId);
+            });
+
+            // =========================
+            // Anja: PROJEKTPHASEN_MA
+            // =========================
+            modelBuilder.Entity<ProjektPhasenMA>(ppma =>
+            {
+                ppma.ToTable("ProjektPhasenMA");
+                ppma.Property(x => x.Id).ValueGeneratedOnAdd();
+                ppma.Property(x => x.Rolle).IsRequired(false);
+                ppma.Property(x => x.Zustandigkeit).IsRequired(false);
+
+                ppma.HasOne(x => x.Benutzer)
+                    .WithMany(b => b.ProjektPhasenMitarbeiter)
+                    .HasForeignKey(x => x.BenutzerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                ppma.HasOne(x => x.ProjektPhase)
+                    .WithMany(p => p.ProjektPhasenMitarbeiter)
+                    .HasForeignKey(x => x.ProjektphasenId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                ppma.HasIndex(x => x.BenutzerId);
+                ppma.HasIndex(x => x.ProjektphasenId);
             });
 
             // =========================

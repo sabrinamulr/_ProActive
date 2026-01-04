@@ -58,6 +58,10 @@ namespace ProActive2508.Models.Entity.Anja
         [InverseProperty(nameof(Antwort.Projekt))]
         public ICollection<Antwort> Antworten { get; set; } = new List<Antwort>();
 
+        // 1:n Projekt -> ProjektPhase
+        [InverseProperty(nameof(ProjektPhase.Projekt))]
+        public ICollection<ProjektPhase> ProjektPhasen { get; set; } = new List<ProjektPhase>();
+
     }
 
     public enum Projektstatus
