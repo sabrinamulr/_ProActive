@@ -21,11 +21,15 @@ namespace ProActive2508.Components.Pages.Sabrina
         protected string modalTitle = string.Empty;
         protected Projekt? editModel;
 
+        // Phasen-Lookups
+        protected Dictionary<int, List<ProjektPhase>> projectPhasesLookup = new();
+        protected Dictionary<int, ProjektPhase?> currentPhaseLookup = new();
+        protected bool isProjektleiterRole = false;
+
         [Inject] private AppDbContext Db { get; set; } = default!;
         [CascadingParameter] private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
 
         private int CurrentUserId;
-        private bool isProjektleiterRole;
 
         protected override async Task OnInitializedAsync()
         {
@@ -75,6 +79,48 @@ namespace ProActive2508.Components.Pages.Sabrina
                     .ToListAsync();
 
                 userLookup = users.ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.Email) ? $"User#{x.Id}" : x.Email);
+
+                // --- Lade Phasen für angezeigte Projekte ---
+                var projectIds = projects.Select(p => p.Id).ToList();
+                if (projectIds.Any())
+                {
+                    var phases = await Db.ProjektPhasen
+                        .AsNoTracking()
+                        .Where(pp => projectIds.Contains(pp.ProjekteId))
+                        .Include(pp => pp.Phase)
+                        .OrderBy(pp => pp.StartDate)
+                        .ToListAsync();
+
+                    projectPhasesLookup = phases
+                        .GroupBy(pp => pp.ProjekteId)
+                        .ToDictionary(g => g.Key, g => g.ToList());
+
+                    // bestimme aktuelle Phase je Projekt
+                    foreach (var kv in projectPhasesLookup)
+                    {
+                        var list = kv.Value;
+                        ProjektPhase? current = null;
+                        var today = DateTime.Today;
+
+                        // bevorzugt: aktive Phase (StartDate <= today <= DueDate and Abschlussdatum null or >= today)
+                        current = list.FirstOrDefault(pp =>
+                            pp.StartDate.Date <= today && pp.DueDate.Date >= today && (pp.Abschlussdatum == null || pp.Abschlussdatum.Value.Date >= today));
+
+                        // fallback: die letzte gestartete Phase vor heute
+                        if (current == null)
+                            current = list.Where(pp => pp.StartDate.Date <= today).OrderByDescending(pp => pp.StartDate).FirstOrDefault();
+
+                        // sonst: erste Phase
+                        if (current == null)
+                            current = list.OrderBy(pp => pp.StartDate).FirstOrDefault();
+
+                        currentPhaseLookup[kv.Key] = current;
+                    }
+                }
+                else
+                {
+                    projectPhasesLookup = new Dictionary<int, List<ProjektPhase>>();
+                }
             }
             catch (Exception ex)
             {
@@ -88,7 +134,6 @@ namespace ProActive2508.Components.Pages.Sabrina
 
         protected bool CanEdit(Projekt p)
         {
-            // Projektleiter-Rolle oder spezifischer Projektleiter des Projekts darf bearbeiten
             return isProjektleiterRole || p.ProjektleiterId == CurrentUserId;
         }
 
@@ -112,7 +157,6 @@ namespace ProActive2508.Components.Pages.Sabrina
             uiError = null;
             if (editModel is null) return;
 
-            // einfache serverseitige Absicherung: darf der aktuelle Nutzer wirklich das Projekt editieren?
             if (!CanEdit(editModel))
             {
                 uiError = "Keine Berechtigung zum Bearbeiten dieses Projekts.";
@@ -124,15 +168,11 @@ namespace ProActive2508.Components.Pages.Sabrina
                 Db.Projekte.Update(editModel);
                 await Db.SaveChangesAsync();
                 isModalOpen = false;
+                await OnInitializedAsync(); // reload
             }
             catch (Exception ex)
             {
                 uiError = "Fehler beim Speichern: " + (ex.InnerException?.Message ?? ex.Message);
-            }
-            finally
-            {
-                // Reload list to show changes (optional)
-                await OnInitializedAsync();
             }
         }
     }

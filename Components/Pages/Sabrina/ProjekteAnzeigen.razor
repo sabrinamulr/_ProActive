@@ -1,5 +1,6 @@
 ﻿@page "/meine-projekte"
 @using Microsoft.AspNetCore.Authorization
+@using ProActive2508.Models.Entity.Anja
 @rendermode InteractiveServer
 
 <h3>Projekte</h3>
@@ -27,11 +28,10 @@ else
             <thead>
                 <tr>
                     <th style="width:70px;">Id</th>
-                    <th>Beschreibung</th>
+                    <th>Projekt</th>
+                    <th style="min-width:320px;">Aktuelle Phase / Phasenverlauf</th>
                     <th style="width:220px;">Projektleiter</th>
                     <th style="width:220px;">Auftraggeber</th>
-                    <th style="width:120px;">Status</th>
-                    <th style="width:120px;">Phase</th>
                     <th style="width:140px;">Aktion</th>
                 </tr>
             </thead>
@@ -41,12 +41,68 @@ else
                     <tr>
                         <td>@p.Id</td>
                         <td>
-                            <a href="@($"/projekt/{p.Id}")">@((string.IsNullOrWhiteSpace(p.Projektbeschreibung) ? "-" : p.Projektbeschreibung))</a>
+                            <a href="@($"/projekt/{p.Id}")" class="fw-semibold">@($"Projekt #{p.Id}")</a>
+                            <div class="text-muted small">@p.Projektbeschreibung</div>
+                        </td>
+                        <td>
+                            @if (isProjektleiterRole)
+                            {
+                                @* Projektleiter: komplette Phase-Liste *@
+                                var list = projectPhasesLookup.TryGetValue(p.Id, out var phs) ? phs : null;
+                                if (list == null || !list.Any())
+                                {
+                                    <div class="text-muted small">Keine Phasen hinterlegt.</div>
+                                }
+                                else
+                                {
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        @foreach (var pp in list)
+                                        {
+                                            <div class="badge bg-light text-dark border">
+                                                <div class="fw-semibold">@pp.Phase?.Kurzbezeichnung</div>
+                                                <div class="small text-muted">@($"{pp.StartDate:dd.MM.yyyy} → {pp.DueDate:dd.MM.yyyy}")</div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                @* Mitarbeiter: nur aktuelle Phase + Zeitstrahl *@
+                                var cur = currentPhaseLookup.TryGetValue(p.Id, out var c) ? c : null;
+                                var all = projectPhasesLookup.TryGetValue(p.Id, out var phases) ? phases : new List<ProjektPhase>();
+                                if (cur == null)
+                                {
+                                    <div class="text-muted small">Keine aktive Phase.</div>
+                                }
+                                else
+                                {
+                                    <div class="mb-2">
+                                        <div class="fw-semibold">@cur.Phase?.Bezeichnung</div>
+                                        <div class="small text-muted">@($"{cur.StartDate:dd.MM.yyyy} – {cur.DueDate:dd.MM.yyyy}")</div>
+                                    </div>
+
+                                    @* Simple timeline/progress bar: equal segments for phases, highlight current *@
+                                    <div class="timeline d-flex" style="gap:6px;">
+                                        @if (all == null || !all.Any())
+                                        {
+                                            <div class="text-muted small">Phasen fehlen.</div>
+                                        }
+                                        else
+                                        {
+                                            var segWidth = Math.Max(8, 100 / all.Count);
+                                            foreach (var seg in all)
+                                            {
+                                                var isCurrent = seg.Id == cur.Id;
+                                                <div style=@($"flex:0 0 {segWidth}%; height:12px; border-radius:4px; background:{(isCurrent ? "#0d6efd" : "#e9ecef")};") title="@($"{seg.Phase?.Kurzbezeichnung} {seg.StartDate:dd.MM}→{seg.DueDate:dd.MM}")"></div>
+                                            }
+                                        }
+                                    </div>
+                                }
+                            }
                         </td>
                         <td>@(userLookup.TryGetValue(p.ProjektleiterId, out var pl) ? pl : $"Id:{p.ProjektleiterId}")</td>
                         <td>@(userLookup.TryGetValue(p.AuftraggeberId, out var ag) ? ag : $"Id:{p.AuftraggeberId}")</td>
-                        <td>@p.Status</td>
-                        <td>@p.Phase</td>
                         <td>
                             @if (CanEdit(p))
                             {
@@ -63,4 +119,37 @@ else
         </table>
     </div>
 }
-...
+
+@if (isModalOpen)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1" style="--bs-modal-width: 720px;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h5 class="modal-title">@modalTitle</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+                </div>
+
+                <EditForm Model="editModel" OnValidSubmit="SaveEditAsync" FormName="ProjektEditForm">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Beschreibung</label>
+                            <InputTextArea class="form-control" @bind-Value="editModel.Projektbeschreibung" rows="4" />
+                        </div>
+                    </div>
+
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseModal">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary">Speichern</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .timeline { align-items:center; }
+</style>

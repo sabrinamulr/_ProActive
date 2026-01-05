@@ -1,0 +1,106 @@
+﻿@page "/projekt/{ProjectId:int}/phasen-definieren"
+@using Microsoft.AspNetCore.Authorization
+@using ProActive2508.Models.Entity.Anja
+@attribute [Authorize(Roles = "Projektleiter")]
+@rendermode InteractiveServer
+
+<h3>Phasen definieren / an Projekt anpassen</h3>
+
+@if (isLoading)
+{
+    <p>Lade…</p>
+}
+else if (project is null)
+{
+    <div class="alert alert-warning">Projekt nicht gefunden.</div>
+}
+else
+{
+    <div class="mb-3">
+        <strong>@($"Projekt #{project.Id}")</strong>
+        <div class="text-muted">@project.Projektbeschreibung</div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(uiError))
+    {
+        <div class="alert alert-warning">@uiError</div>
+    }
+
+    <EditForm OnValidSubmit="SaveAsync" Model="this">
+        <DataAnnotationsValidator />
+
+        <div class="mb-3">
+            <label class="form-label">Phasen (feste Reihenfolge, nur Datum / Ampel / Notizen editierbar)</label>
+            <div class="list-group">
+                @foreach (var sel in selections)
+                {
+                    <div class="list-group-item">
+                        <div class="row g-2 align-items-center">
+                            <div class="col">
+                                <div class="fw-semibold">@sel.Phase.Kurzbezeichnung — @sel.Phase.Bezeichnung</div>
+                                <div class="text-muted small">PhaseId: @sel.Phase.Id</div>
+                            </div>
+                        </div>
+
+                        <div class="mt-2 row g-2">
+                            <div class="col-md-3">
+                                <label class="form-label">Start</label>
+                                <InputDate class="form-control" @bind-Value="sel.StartDate" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Due</label>
+                                <InputDate class="form-control" @bind-Value="sel.DueDate" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Ampel‑Status</label>
+                                <InputSelect class="form-select" @bind-Value="sel.Status">
+                                    <option value="">— wählen —</option>
+                                    <option value="Grün">Grün</option>
+                                    <option value="Gelb">Gelb</option>
+                                    <option value="Rot">Rot</option>
+                                    <option value="Geplant">Geplant</option>
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Verantwortlicher</label>
+                                <InputSelect class="form-select" @bind-Value="sel.VerantwortlicherbenutzerId">
+                                    <option value="0">-- auswählen --</option>
+                                    @foreach (var u in allUsers)
+                                    {
+                                        <option value="@u.Id">@u.Email</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+
+                        <div class="mt-2">
+                            <label class="form-label">Notizen</label>
+                            <InputTextArea class="form-control"
+                                           @bind-Value="sel.Notizen"
+                                           rows="3"
+                                           maxlength="@PhaseConfig.MaxNotesLength" />
+                            <div class="d-flex justify-content-between mt-1 small text-muted">
+                                <div>Max. @PhaseConfig.MaxNotesLength Zeichen</div>
+                                <div>@(sel.Notizen?.Length ?? 0) / @PhaseConfig.MaxNotesLength</div>
+                            </div>
+
+                            <div class="mt-2">
+                                <label class="form-label">Vorschau</label>
+                                <div class="p-2 bg-light border" style="white-space:pre-wrap;">
+                                    @((sel.Notizen ?? string.Empty))
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="form-text mt-2">Hinweis: Reihenfolge und Phase‑Definition stammen aus der globalen Phasenliste und sind unveränderlich.</div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit" disabled="@isSaving">Speichern</button>
+            <button class="btn btn-secondary" type="button" @onclick="Cancel">Abbrechen</button>
+        </div>
+    </EditForm>
+}
