@@ -22,24 +22,24 @@ namespace ProActive2508.Components.Pages.Sabrina
 
         protected override async Task OnInitializedAsync()
         {
-            var auth = await Auth.GetAuthenticationStateAsync();
-            var user = auth.User;
+            AuthenticationState auth = await Auth.GetAuthenticationStateAsync();
+            System.Security.Claims.ClaimsPrincipal user = auth.User;
 
-            var idClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            string? idClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                           ?? user.FindFirst("sub")?.Value;
 
             int parsed = 0;
             if (!int.TryParse(idClaim, out parsed) || parsed <= 0)
             {
-                var name = user.Identity?.Name ?? string.Empty;
-                if (!string.IsNullOrWhiteSpace(name) && int.TryParse(name, out var pn))
+                string? name = user.Identity?.Name ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(name) && int.TryParse(name, out int pn))
                 {
-                    var dbUser = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == pn);
+                    Benutzer? dbUser = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == pn);
                     parsed = dbUser?.Id ?? 0;
                 }
                 else
                 {
-                    var dbUserByMail = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
+                    Benutzer? dbUserByMail = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
                     parsed = dbUserByMail?.Id ?? 0;
                 }
             }
@@ -74,7 +74,7 @@ namespace ProActive2508.Components.Pages.Sabrina
 
             try
             {
-                var projekt = new Projekt
+                Projekt projekt = new Projekt
                 {
                     BenutzerId = CurrentUserId,
                     ProjektleiterId = CurrentUserId,
@@ -87,7 +87,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                 Db.Projekte.Add(projekt);
                 await Db.SaveChangesAsync();
 
-                var newId = projekt.Id;
+                int newId = projekt.Id;
 
                 if (redirectToPhases)
                 {

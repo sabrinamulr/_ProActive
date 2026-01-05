@@ -21,6 +21,11 @@ namespace ProActive2508.Components.Pages.Sabrina
         protected bool CanEdit = false;
         protected Dictionary<int, string> _userLookup = new();
 
+        // neu: Phasen-Daten & Rollenflag
+        protected List<ProjektPhase>? projectPhases;
+        protected ProjektPhase? currentPhase;
+        protected bool isProjektleiterRole = false;
+
         [Inject] private AppDbContext Db { get; set; } = default!;
         [CascadingParameter] private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
 
@@ -34,41 +39,102 @@ namespace ProActive2508.Components.Pages.Sabrina
             isLoading = true;
             try
             {
-                var auth = await AuthenticationStateTask;
-                var user = auth.User;
+                AuthenticationState auth = await AuthenticationStateTask;
+                System.Security.Claims.ClaimsPrincipal user = auth.User;
 
-                var idClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                string? idClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                               ?? user.FindFirst("sub")?.Value;
                 int currentUserId = 0;
                 if (!int.TryParse(idClaim, out currentUserId) || currentUserId <= 0)
                 {
-                    var name = user.Identity?.Name ?? string.Empty;
-                    if (!string.IsNullOrWhiteSpace(name) && int.TryParse(name, out var pn))
+                    string? name = user.Identity?.Name ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(name) && int.TryParse(name, out int pn))
                     {
-                        var dbUser = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == pn);
+                        Benutzer? dbUser = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == pn);
                         currentUserId = dbUser?.Id ?? 0;
                     }
                     else
                     {
-                        var dbUserByMail = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
+                        Benutzer? dbUserByMail = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
                         currentUserId = dbUserByMail?.Id ?? 0;
                     }
                 }
 
                 project = await Db.Projekte.AsNoTracking().FirstOrDefaultAsync(p => p.Id == Id);
-                if (project is null) return;
+                if (project is null)
+                {
+                    // keep lookups empty
+                    _userLookup = new Dictionary<int, string>();
+                    projectPhases = new List<ProjektPhase>();
+                    currentPhase = null;
+                    CanEdit = false;
+                    isProjektleiterRole = false;
+                    return;
+                }
 
-                var userIds = new[] { project.ProjektleiterId, project.AuftraggeberId }.Where(i => i > 0).Distinct().ToList();
-                var users = await Db.Benutzer.AsNoTracking().Where(b => userIds.Contains(b.Id)).Select(b => new { b.Id, b.Email }).ToListAsync();
-                _userLookup = users.ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.Email) ? $"User#{x.Id}" : x.Email);
+                List<int> userIds = new List<int> { project.ProjektleiterId, project.AuftraggeberId };
+                userIds = userIds.Where(i => i > 0).Distinct().ToList();
+                if (userIds.Count > 0)
+                {
+                    Dictionary<int, string> lookup = await Db.Benutzer
+                        .AsNoTracking()
+                        .Where(b => userIds.Contains(b.Id))
+                        .ToDictionaryAsync(b => b.Id, b => string.IsNullOrWhiteSpace(b.Email) ? $"User#{b.Id}" : b.Email);
+                    _userLookup = lookup;
+                }
+                else
+                {
+                    _userLookup = new Dictionary<int, string>();
+                }
 
                 // Berechtigung prüfen: Rolle Projektleiter oder spezifischer Projektleiter
-                var isRoleProjektleiter = user.IsInRole("Projektleiter");
-                CanEdit = isRoleProjektleiter || project.ProjektleiterId == currentUserId;
+                isProjektleiterRole = user.IsInRole("Projektleiter");
+                CanEdit = isProjektleiterRole || project.ProjektleiterId == currentUserId;
+
+                // Phasen + aktuelle Phase laden
+                projectPhases = await Db.ProjektPhasen
+                    .AsNoTracking()
+                    .Where(pp => pp.ProjekteId == project.Id)
+                    .Include(pp => pp.Phase)
+                    .OrderBy(pp => pp.StartDate)
+                    .ToListAsync();
+
+                if (projectPhases != null && projectPhases.Count > 0)
+                {
+                    ProjektPhase? active = null;
+                    DateTime today = DateTime.Today;
+
+                    // bevorzugt: aktive Phase (StartDate <= today <= DueDate and Abschlussdatum null or >= today)
+                    active = projectPhases.FirstOrDefault(pp =>
+                        pp.StartDate.Date <= today && pp.DueDate.Date >= today && (pp.Abschlussdatum == null || pp.Abschlussdatum.Value.Date >= today));
+
+                    // fallback: die letzte gestartete Phase vor heute
+                    if (active == null)
+                    {
+                        active = projectPhases.Where(pp => pp.StartDate.Date <= today).OrderByDescending(pp => pp.StartDate).FirstOrDefault();
+                    }
+
+                    // sonst: erste Phase
+                    if (active == null)
+                    {
+                        active = projectPhases.OrderBy(pp => pp.StartDate).FirstOrDefault();
+                    }
+
+                    currentPhase = active;
+                }
+                else
+                {
+                    currentPhase = null;
+                }
             }
             catch
             {
                 project = null;
+                _userLookup = new Dictionary<int, string>();
+                projectPhases = new List<ProjektPhase>();
+                currentPhase = null;
+                CanEdit = false;
+                isProjektleiterRole = false;
             }
             finally
             {
@@ -106,7 +172,6 @@ namespace ProActive2508.Components.Pages.Sabrina
             catch (Exception)
             {
                 // Fehlerbehandlung nach Bedarf
-
             }
         }
 

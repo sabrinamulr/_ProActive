@@ -44,16 +44,31 @@ namespace ProActive2508.Components.Pages.Sabrina
                 phases = await Db.Phasen.AsNoTracking().OrderBy(p => p.Id).ToListAsync();
                 allUsers = await Db.Benutzer.AsNoTracking().OrderBy(b => b.Email).ToListAsync();
 
-                var existing = await Db.ProjektPhasen
+                List<ProjektPhase> existingProjektPhasen = await Db.ProjektPhasen
                     .Where(pp => pp.ProjekteId == ProjectId)
                     .AsNoTracking()
                     .ToListAsync();
 
-                // Build configs: für jede globale Phase immer ein Eintrag (Reihenfolge unveränderlich)
-                selections = phases.Select(ph =>
+                // lade alle Meilenstein‑Vorlagen (global)
+                List<Meilenstein> meilensteinVorlagen = await Db.Meilensteine
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                // Build selections: für jede globale Phase immer ein Eintrag (Reihenfolge unveränderlich)
+                selections = new List<PhaseConfig>();
+                foreach (var ph in phases)
                 {
-                    var ex = existing.FirstOrDefault(e => e.PhasenId == ph.Id);
-                    return new PhaseConfig
+                    ProjektPhase? ex = existingProjektPhasen.FirstOrDefault(e => e.PhasenId == ph.Id);
+                    PhaseMeilenstein? exPm = null;
+                    if (ex != null)
+                    {
+                        exPm = await Db.PhaseMeilensteine
+                            .AsNoTracking()
+                            .Include(pm => pm.Meilenstein)
+                            .FirstOrDefaultAsync(pm => pm.ProjektphasenId == ex.Id);
+                    }
+
+                    PhaseConfig cfg = new PhaseConfig
                     {
                         Phase = ph,
                         ExistingId = ex?.Id ?? 0,
@@ -61,9 +76,17 @@ namespace ProActive2508.Components.Pages.Sabrina
                         DueDate = ex?.DueDate ?? DateTime.Today.AddDays(14),
                         VerantwortlicherbenutzerId = ex?.VerantwortlicherbenutzerId ?? project.ProjektleiterId,
                         Notizen = ex?.Notizen,
-                        Status = ex?.Status ?? "Geplant"
+                        Status = ex?.Status ?? "Geplant",
+
+                        // Meilenstein-Felder: falls bereits projektbezogen vorhanden, sonst Standardwerte
+                        MeilensteinZieldatum = exPm?.Zieldatum ?? (ex?.DueDate ?? DateTime.Today.AddDays(14)),
+                        MeilensteinErreichtDatum = exPm?.Erreichtdatum,
+                        MeilensteinGenehmigerId = exPm?.GenehmigerbenutzerId ?? (ex?.VerantwortlicherbenutzerId ?? project.ProjektleiterId),
+                        MeilensteinStatus = exPm?.Status ?? "nicht erreicht"
                     };
-                }).ToList();
+
+                    selections.Add(cfg);
+                }
             }
             catch (Exception ex)
             {
@@ -83,8 +106,8 @@ namespace ProActive2508.Components.Pages.Sabrina
 
             try
             {
-                // Validierung: Start <= Due für alle
-                foreach (var cfg in selections)
+                // Validierung: Start <= Due für alle und Notizen‑Länge
+                foreach (PhaseConfig cfg in selections)
                 {
                     if (cfg.StartDate.Date > cfg.DueDate.Date)
                     {
@@ -100,14 +123,15 @@ namespace ProActive2508.Components.Pages.Sabrina
                     }
                 }
 
-                var existing = await Db.ProjektPhasen.Where(pp => pp.ProjekteId == ProjectId).ToListAsync();
+                // 1) vorhandene ProjektPhasen laden (zur Upsert-Entscheidung)
+                List<ProjektPhase> existingProjektPhasen = await Db.ProjektPhasen.Where(pp => pp.ProjekteId == ProjectId).ToListAsync();
 
-                // Upsert: für jede Phase entweder update oder insert (keine Lösch-Logik, Phasen bleiben in DB)
-                foreach (var sel in selections)
+                // 2) Upsert ProjektPhasen
+                foreach (PhaseConfig sel in selections)
                 {
                     if (sel.ExistingId != 0)
                     {
-                        var upd = existing.FirstOrDefault(e => e.Id == sel.ExistingId);
+                        ProjektPhase? upd = existingProjektPhasen.FirstOrDefault(e => e.Id == sel.ExistingId);
                         if (upd != null)
                         {
                             upd.StartDate = sel.StartDate;
@@ -120,7 +144,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                     }
                     else
                     {
-                        var neu = new ProjektPhase
+                        ProjektPhase neu = new ProjektPhase
                         {
                             ProjekteId = ProjectId,
                             PhasenId = sel.Phase.Id,
@@ -131,6 +155,87 @@ namespace ProActive2508.Components.Pages.Sabrina
                             Notizen = sel.Notizen
                         };
                         Db.ProjektPhasen.Add(neu);
+                    }
+                }
+
+                await Db.SaveChangesAsync();
+
+                // 3) Nach Save: projektPhasen neu laden und projektbezogene Meilensteine
+                List<ProjektPhase> projektPhasenNachSave = await Db.ProjektPhasen
+                    .Where(pp => pp.ProjekteId == ProjectId)
+                    .ToListAsync();
+
+                List<int> projektPhasenIdsNachSave = projektPhasenNachSave.Select(pp => pp.Id).ToList();
+                List<PhaseMeilenstein> existingProjektMeilensteine = new();
+                if (projektPhasenIdsNachSave.Count > 0)
+                {
+                    existingProjektMeilensteine = await Db.PhaseMeilensteine
+                        .Where(pm => projektPhasenIdsNachSave.Contains(pm.ProjektphasenId))
+                        .Include(pm => pm.Meilenstein)
+                        .ToListAsync();
+                }
+
+                // 4) lade alle Meilenstein‑Vorlagen (global) — Vorlagen enthalten nur Bezeichnung
+                List<Meilenstein> meilensteinVorlagen = await Db.Meilensteine
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                // 5) Upsert PhaseMeilenstein (weist Vorlagen/Meilensteine der ProjektPhase zu)
+                List<PhaseMeilenstein> existingPhaseMeilensteine = await Db.PhaseMeilensteine
+                    .Where(pm => projektPhasenIdsNachSave.Contains(pm.ProjektphasenId))
+                    .ToListAsync();
+
+                foreach (PhaseConfig sel in selections)
+                {
+                    ProjektPhase? linkedProjektPhase = projektPhasenNachSave.FirstOrDefault(pp => pp.PhasenId == sel.Phase.Id);
+                    if (linkedProjektPhase == null) continue;
+
+                    // Template lookup by exact Bezeichnung == Phase.Kurzbezeichnung (fallback: contains)
+                    Meilenstein? template = meilensteinVorlagen.FirstOrDefault(t => string.Equals(t.Bezeichnung?.Trim(), sel.Phase.Kurzbezeichnung?.Trim(), StringComparison.OrdinalIgnoreCase))
+                        ?? meilensteinVorlagen.FirstOrDefault(t => (t.Bezeichnung ?? string.Empty).IndexOf(sel.Phase.Kurzbezeichnung ?? string.Empty, StringComparison.OrdinalIgnoreCase) >= 0);
+
+                    int templateId = template?.Id ?? 0;
+
+                    PhaseMeilenstein? existingPm = existingPhaseMeilensteine.FirstOrDefault(pm => pm.ProjektphasenId == linkedProjektPhase.Id);
+
+                    if (existingPm != null)
+                    {
+                        // Update bestehender PhaseMeilenstein
+                        if (templateId != 0)
+                        {
+                            existingPm.MeilensteinId = templateId;
+                        }
+                        existingPm.GenehmigerbenutzerId = sel.MeilensteinGenehmigerId;
+                        existingPm.Status = sel.MeilensteinStatus;
+                        existingPm.Zieldatum = sel.MeilensteinZieldatum;
+                        existingPm.Erreichtdatum = sel.MeilensteinErreichtDatum;
+                        Db.PhaseMeilensteine.Update(existingPm);
+                    }
+                    else
+                    {
+                        // Neues PhaseMeilenstein anlegen
+                        PhaseMeilenstein neuPm = new PhaseMeilenstein
+                        {
+                            ProjektphasenId = linkedProjektPhase.Id,
+                            MeilensteinId = templateId,
+                            GenehmigerbenutzerId = sel.MeilensteinGenehmigerId,
+                            Status = sel.MeilensteinStatus,
+                            Zieldatum = sel.MeilensteinZieldatum,
+                            Erreichtdatum = sel.MeilensteinErreichtDatum
+                        };
+                        Db.PhaseMeilensteine.Add(neuPm);
+                    }
+
+                    // Optional: lege zusätzlich ein projekt‑gebundenes PhaseMeilenstein Entity an/aktualisiere es,
+                    // falls dein Modell Meilenstein sowohl als Vorlage als auch als Instanz verwendet.
+                    PhaseMeilenstein? msInst = existingProjektMeilensteine.FirstOrDefault(m => m.ProjektphasenId == linkedProjektPhase.Id);
+                    if (msInst != null)
+                    {
+                        msInst.Status = sel.MeilensteinStatus;
+                        msInst.Zieldatum = sel.MeilensteinZieldatum;
+                        msInst.Erreichtdatum = sel.MeilensteinErreichtDatum;
+                        msInst.GenehmigerbenutzerId = sel.MeilensteinGenehmigerId;
+                        Db.PhaseMeilensteine.Update(msInst);
                     }
                 }
 
@@ -153,7 +258,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             Nav.NavigateTo($"/projekt/{ProjectId}");
         }
 
-        protected class PhaseConfig
+        public class PhaseConfig
         {
             public const int MaxNotesLength = 2000;
 
@@ -163,7 +268,13 @@ namespace ProActive2508.Components.Pages.Sabrina
             public DateTime DueDate { get; set; }
             public int VerantwortlicherbenutzerId { get; set; }
             public string? Notizen { get; set; }
-            public string? Status { get; set; }    // z.B. "Grün"/"Gelb"/"Rot"/"Geplant"
+            public string? Status { get; set; }    // z. B. "Grün"/"Gelb"/"Rot"/"Geplant"
+
+            // Meilenstein-spezifische Felder (vom Projektleiter gesetzt)
+            public DateTime MeilensteinZieldatum { get; set; }
+            public DateTime? MeilensteinErreichtDatum { get; set; }
+            public int MeilensteinGenehmigerId { get; set; }
+            public string? MeilensteinStatus { get; set; } // "nicht erreicht","erreicht","freigegeben"
         }
     }
 }

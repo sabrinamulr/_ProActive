@@ -30,9 +30,9 @@ else
         <DataAnnotationsValidator />
 
         <div class="mb-3">
-            <label class="form-label">Phasen (feste Reihenfolge, nur Datum / Ampel / Notizen editierbar)</label>
+            <label class="form-label">Phasen (feste Reihenfolge, nur Datum / Ampel / Notizen / Meilenstein editierbar)</label>
             <div class="list-group">
-                @foreach (var sel in selections)
+                @foreach (PhaseConfig sel in selections)
                 {
                     <div class="list-group-item">
                         <div class="row g-2 align-items-center">
@@ -62,10 +62,10 @@ else
                                 </InputSelect>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label">Verantwortlicher</label>
+                                <label class="form-label">Verantwortlicher (Phase)</label>
                                 <InputSelect class="form-select" @bind-Value="sel.VerantwortlicherbenutzerId">
                                     <option value="0">-- auswählen --</option>
-                                    @foreach (var u in allUsers)
+                                    @foreach (Benutzer u in allUsers)
                                     {
                                         <option value="@u.Id">@u.Email</option>
                                     }
@@ -77,17 +77,49 @@ else
                             <label class="form-label">Notizen</label>
                             <InputTextArea class="form-control"
                                            @bind-Value="sel.Notizen"
-                                           rows="3"
+                                           rows="2"
                                            maxlength="@PhaseConfig.MaxNotesLength" />
                             <div class="d-flex justify-content-between mt-1 small text-muted">
                                 <div>Max. @PhaseConfig.MaxNotesLength Zeichen</div>
                                 <div>@(sel.Notizen?.Length ?? 0) / @PhaseConfig.MaxNotesLength</div>
                             </div>
+                        </div>
 
-                            <div class="mt-2">
-                                <label class="form-label">Vorschau</label>
-                                <div class="p-2 bg-light border" style="white-space:pre-wrap;">
-                                    @((sel.Notizen ?? string.Empty))
+                        <hr />
+
+                        <div class="mt-2">
+                            <div class="fw-semibold">Meilenstein (Phase)</div>
+
+                            <div class="row g-2 mt-1">
+                                <div class="col-md-3">
+                                    <label class="form-label">Zieldatum (Soll)</label>
+                                    <InputDate class="form-control" @bind-Value="sel.MeilensteinZieldatum" />
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="form-label">Erreicht am (Ist)</label>
+                                    <InputDate class="form-control" @bind-Value="sel.MeilensteinErreichtDatum" />
+                                    <div class="form-text small">leer = noch nicht erreicht</div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="form-label">Genehmiger (verantwortlich für Gate‑Exit)</label>
+                                    <InputSelect class="form-select" @bind-Value="sel.MeilensteinGenehmigerId">
+                                        <option value="0">-- auswählen --</option>
+                                        @foreach (Benutzer u in allUsers)
+                                        {
+                                            <option value="@u.Id">@u.Email</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="form-label">Meilenstein‑Status</label>
+                                    <InputSelect class="form-select" @bind-Value="sel.MeilensteinStatus">
+                                        <option value="nicht erreicht">nicht erreicht</option>
+                                        <option value="erreicht">erreicht</option>
+                                        <option value="freigegeben">freigegeben</option>
+                                    </InputSelect>
                                 </div>
                             </div>
                         </div>
