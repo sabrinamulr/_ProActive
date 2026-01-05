@@ -1,5 +1,114 @@
-﻿<h3>auswertung</h3>
+﻿@page "/auswertung"
+
+@using ProActive2508.Data
+@using ProActive2508.Models.Entity.Anja
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext _context
+@inject IJSRuntime JS
+
+<h2>Auswertung</h2>
+
+@if (isLoading)
+{
+    <p>Lade Daten…</p>
+}
+else
+{
+    <div class="mb-3">
+        <label>Projekt auswählen:</label>
+        <select class="form-select" value="@selectedProjectId" @onchange="ProjektGewechselt">
+            <option value="">-- Projekt wählen --</option>
+            @foreach (var p in projekte)
+            {
+                <option value="@p.Id">@p.Projektbeschreibung</option>
+            }
+        </select>
+    </div>
+
+    @if (aktuellesProjekt != null)
+    {
+        <h3>@aktuellesProjekt.Projektbeschreibung</h3>
+        <p><strong>Status:</strong> @aktuellesProjekt.Status</p>
+
+        <canvas id="ratingChart" width="400" height="200"></canvas>
+
+        <h4 class="mt-4">Alle Antworten</h4>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Frage</th>
+                    <th>Sterne</th>
+                    <th>Datum</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in antworten)
+                {
+                    <tr>
+                        <td>@a.FrageId</td>
+                        <td>@a.Rating</td>
+                        <td>@a.Datum.ToString("dd.MM.yyyy HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
 
 @code {
+    private bool isLoading = true;
+    private List<Projekt> projekte = new();
+    private Projekt? aktuellesProjekt;
+    private List<Antwort> antworten = new();
 
+    private int? selectedProjectId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        projekte = await _context.Projekte
+            .OrderBy(p => p.Projektbeschreibung)
+            .ToListAsync();
+
+        isLoading = false;
+    }
+
+    private async Task ProjektGewechselt(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int id))
+        {
+            selectedProjectId = id;
+            await LadeAuswertung();
+        }
+    }
+
+    private async Task LadeAuswertung()
+    {
+        Console.WriteLine("LadeAuswertung wurde gestartet!");
+
+        if (selectedProjectId is null)
+            return;
+
+        aktuellesProjekt = await _context.Projekte
+            .FirstOrDefaultAsync(p => p.Id == selectedProjectId);
+
+        antworten = await _context.Antworten
+            .Where(a => a.ProjektId == selectedProjectId)
+            .ToListAsync();
+
+        var counts = new int[5];
+        foreach (var a in antworten)
+        {
+            if (a.Rating >= 1 && a.Rating <= 5)
+                counts[a.Rating - 1]++;
+        }
+        Console.WriteLine("JS wird aufgerufen!");
+
+        await JS.InvokeVoidAsync("renderRatingChart", counts);
+        Console.WriteLine("JS wurde aufgerufen!");
+
+
+        Console.WriteLine($"Antworten geladen: {antworten.Count}");
+
+        Console.WriteLine($"Counts: {string.Join(",", counts)}");
+    }
 }
