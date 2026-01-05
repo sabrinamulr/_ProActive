@@ -1,7 +1,4 @@
-﻿// Datei: Service/ProjekteService.cs
-// Seite: ProjekteService
-
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using ProActive2508.Data;
 using ProActive2508.Models.Entity.Anja;
 
