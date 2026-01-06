@@ -223,7 +223,7 @@ namespace ProActive2508.Data
                 ppma.ToTable("ProjektPhasenMA");
                 ppma.Property(x => x.Id).ValueGeneratedOnAdd();
                 ppma.Property(x => x.Rolle).IsRequired(false);
-                ppma.Property(x => x.Zustandigkeit).IsRequired(false);
+                ppma.Property(x => x.Zustandigkeit).IsRequired(false).IsUnicode(false);
 
                 ppma.HasOne(x => x.Benutzer)
                     .WithMany(b => b.ProjektPhasenMitarbeiter)
@@ -330,7 +330,7 @@ namespace ProActive2508.Data
             {
                 a.ToTable("Antwort");
                 a.Property(x => x.Id).ValueGeneratedOnAdd();
-                a.Property(x => x.Datum).HasColumnType("date");
+                a.Property(x => x.Datum).HasColumnType("datetime2");
 
                 a.HasOne(x => x.Frage)
                     .WithMany(f => f.Antworten)

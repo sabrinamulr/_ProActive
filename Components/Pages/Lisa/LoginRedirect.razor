@@ -2,6 +2,7 @@
 @using ProActive2508.Data
 @using ProActive2508.Models.Entity.Anja
 @using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
 @inject AppDbContext _context
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
@@ -15,21 +16,19 @@
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-        if (!user.Identity.IsAuthenticated)
+        if (user.Identity?.IsAuthenticated != true)
         {
             Nav.NavigateTo("/auth/login");
             return;
         }
 
         // Benutzer-ID aus Claims holen
-        var userIdClaim = user.Claims.FirstOrDefault(c => c.Type.Contains("nameidentifier"));
-        if (userIdClaim == null)
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
         {
             Nav.NavigateTo("/");
             return;
         }
-
-        int userId = int.Parse(userIdClaim.Value);
 
         // Prüfen, ob ein abgeschlossenes Projekt ohne Feedback existiert
         var offenesProjekt = await _context.Projekte

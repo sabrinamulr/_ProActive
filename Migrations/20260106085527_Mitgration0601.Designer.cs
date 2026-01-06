@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ProActive2508.Data;
 
@@ -11,9 +12,11 @@ using ProActive2508.Data;
 namespace ProActive2508.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260106085527_Mitgration0601")]
+    partial class Mitgration0601
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -31,7 +34,7 @@ namespace ProActive2508.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("Datum")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("date");
 
                     b.Property<int>("FrageId")
                         .HasColumnType("int");
@@ -641,8 +644,7 @@ namespace ProActive2508.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Zustandigkeit")
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(max)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 

@@ -70,7 +70,10 @@ builder.Services.AddSession(options =>
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseStaticFiles();
 
 app.UseRouting();
