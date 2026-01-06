@@ -28,6 +28,11 @@
                         <span class="bi bi-speedometer2-nav-menu" aria-hidden="true"></span> Passwort ändern
                     </NavLink>
                 </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/auswertung">
+                        <span class="bi bi-speedometer2-nav-menu" aria-hidden="true"></span> Auswertung
+                    </NavLink>
+                </div>
                
                 @* Nur Projektleiter dürfen Projekte anlegen *@
                 @if (state.User.IsInRole("Projektleiter"))

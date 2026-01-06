@@ -1,3 +1,5 @@
+//sicherheitspush
+
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
@@ -22,24 +24,24 @@ namespace ProActive2508.Components.Pages.Sabrina
 
         protected override async Task OnInitializedAsync()
         {
-            var auth = await Auth.GetAuthenticationStateAsync();
-            var user = auth.User;
+            AuthenticationState auth = await Auth.GetAuthenticationStateAsync();
+            System.Security.Claims.ClaimsPrincipal user = auth.User;
 
-            var idClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            string? idClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                           ?? user.FindFirst("sub")?.Value;
 
             int parsed = 0;
             if (!int.TryParse(idClaim, out parsed) || parsed <= 0)
             {
-                var name = user.Identity?.Name ?? string.Empty;
-                if (!string.IsNullOrWhiteSpace(name) && int.TryParse(name, out var pn))
+                string? name = user.Identity?.Name ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(name) && int.TryParse(name, out int pn))
                 {
-                    var dbUser = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == pn);
+                    Benutzer? dbUser = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == pn);
                     parsed = dbUser?.Id ?? 0;
                 }
                 else
                 {
-                    var dbUserByMail = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
+                    Benutzer? dbUserByMail = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
                     parsed = dbUserByMail?.Id ?? 0;
                 }
             }
@@ -47,38 +49,62 @@ namespace ProActive2508.Components.Pages.Sabrina
             CurrentUserId = parsed;
         }
 
+        // Standard-Save (Form-Submit)
         protected async Task SaveAsync()
+        {
+            await SaveCoreAsync(redirectToPhases: false);
+        }
+
+        // Aufruf durch "Erstellen & Phasen definieren"
+        protected async Task SaveAndDefineAsync()
+        {
+            await SaveCoreAsync(redirectToPhases: true);
+        }
+        // Core-Create: gibt bei Erfolg neue Projekt-Id zurück und navigiert je nach Flag
+        private async Task<int> SaveCoreAsync(bool redirectToPhases)
         {
             uiError = null;
 
             if (string.IsNullOrWhiteSpace(model.Name))
             {
                 uiError = "Name ist erforderlich.";
-                return;
+                return 0;
             }
 
             isSaving = true;
 
             try
             {
-                var projekt = new Projekt
+                Projekt projekt = new Projekt
                 {
                     BenutzerId = CurrentUserId,
                     ProjektleiterId = CurrentUserId,
                     AuftraggeberId = CurrentUserId,
                     Projektbeschreibung = model.Name + (string.IsNullOrWhiteSpace(model.Description) ? string.Empty : " — " + model.Description),
-                    Status = 0, // bestehende DB erwartet int/enum-Konvertierung
-                    Phase = 0
+                    Status = Projektstatus.Aktiv,
+                    Phase = Projektphase.Initialisierung
                 };
 
                 Db.Projekte.Add(projekt);
                 await Db.SaveChangesAsync();
 
-                Nav.NavigateTo("/meine-projekte");
+                int newId = projekt.Id;
+
+                if (redirectToPhases)
+                {
+                    Nav.NavigateTo($"/projekt/{newId}/phasen-definieren");
+                }
+                else
+                {
+                    Nav.NavigateTo("/meine-projekte");
+                }
+
+                return newId;
             }
             catch (Exception ex)
             {
                 uiError = ex.InnerException?.Message ?? ex.Message;
+                return 0;
             }
             finally
             {

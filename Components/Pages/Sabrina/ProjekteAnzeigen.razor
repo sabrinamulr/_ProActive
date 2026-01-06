@@ -1,5 +1,6 @@
 ﻿@page "/meine-projekte"
 @using Microsoft.AspNetCore.Authorization
+@using ProActive2508.Models.Entity.Anja
 @rendermode InteractiveServer
 
 <h3>Projekte</h3>
@@ -27,11 +28,10 @@ else
             <thead>
                 <tr>
                     <th style="width:70px;">Id</th>
-                    <th>Beschreibung</th>
+                    <th>Projekt</th>
+                    <th style="min-width:320px;">Aktuelle Phase / Phasenverlauf</th>
                     <th style="width:220px;">Projektleiter</th>
                     <th style="width:220px;">Auftraggeber</th>
-                    <th style="width:120px;">Status</th>
-                    <th style="width:120px;">Phase</th>
                     <th style="width:140px;">Aktion</th>
                 </tr>
             </thead>
@@ -41,16 +41,52 @@ else
                     <tr>
                         <td>@p.Id</td>
                         <td>
-                            <a href="@($"/projekt/{p.Id}")">@((string.IsNullOrWhiteSpace(p.Projektbeschreibung) ? "-" : p.Projektbeschreibung))</a>
+                            <a href="@($"/projekt/{p.Id}")" class="fw-semibold">@($"Projekt #{p.Id}")</a>
+                            <div class="text-muted small">@p.Projektbeschreibung</div>
+                        </td>
+                        <td>
+                            @* Zeige für alle (auch Projektleiter) die tatsächliche aktuelle ProjektPhase aus ProjektPhase *@
+                            @{
+                                var cur = currentPhaseLookup.TryGetValue(p.Id, out var c) ? c : null;
+                                var all = projectPhasesLookup.TryGetValue(p.Id, out var phases) ? phases : new List<ProjektPhase>();
+                            }
+                            @if (cur == null)
+                            {
+                                <div class="text-muted small">Keine aktive Phase.</div>
+                            }
+                            else
+                            {
+                                <div class="mb-2">
+                                    <div class="fw-semibold">@cur.Phase?.Bezeichnung</div>
+                                    <div class="small text-muted">@($"{cur.StartDate:dd.MM.yyyy} – {cur.DueDate:dd.MM.yyyy}")</div>
+                                </div>
+
+                                @* Simple timeline/progress bar: equal segments for phases, highlight current *@
+                                <div class="timeline d-flex" style="gap:6px;">
+                                    @if (all == null || !all.Any())
+                                    {
+                                        <div class="text-muted small">Phasen fehlen.</div>
+                                    }
+                                    else
+                                    {
+                                        var segWidth = Math.Max(8, 100 / all.Count);    
+                                        foreach (var seg in all)
+                                        {
+                                            var isCurrent = cur != null && seg.Id == cur.Id;
+                                            var segStyle = $"flex:0 0 {segWidth}%; height:12px; border-radius:4px; background:{(isCurrent ? "#0d6efd" : "#e9ecef")};";
+                                            var segTitle = $"{seg.Phase?.Kurzbezeichnung} {seg.StartDate:dd.MM}→{seg.DueDate:dd.MM}";
+                                            <div style="@segStyle" title="@segTitle"></div>
+                                        }
+                                    }
+                                </div>
+                            }
                         </td>
                         <td>@(userLookup.TryGetValue(p.ProjektleiterId, out var pl) ? pl : $"Id:{p.ProjektleiterId}")</td>
                         <td>@(userLookup.TryGetValue(p.AuftraggeberId, out var ag) ? ag : $"Id:{p.AuftraggeberId}")</td>
-                        <td>@p.Status</td>
-                        <td>@p.Phase</td>
                         <td>
                             @if (CanEdit(p))
                             {
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenEditModal(p.Id)">Bearbeiten</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="async () => await OpenEditModal(p.Id)">Bearbeiten</button>
                             }
                             else
                             {
@@ -63,4 +99,103 @@ else
         </table>
     </div>
 }
-...
+
+@if (isModalOpen)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1" style="--bs-modal-width: 720px;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h5 class="modal-title">@modalTitle</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+                </div>
+
+                <EditForm Model="editModel" OnValidSubmit="OnValidSubmitHandler" FormName="ProjektEditForm">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Beschreibung</label>
+                            <InputTextArea class="form-control" @bind-Value="EditProjektbeschreibung" rows="4" />
+                        </div>
+
+                        @if (editPhaseSelections != null && editPhaseSelections.Any())
+                        {
+                            <hr />
+                            <h6>Phasen</h6>
+                            @foreach (var sel in editPhaseSelections)
+                            {
+                                <div class="mb-2">
+                                    <div class="fw-semibold">@sel.PhaseKurz</div>
+                                    <div class="row g-2 mt-1">
+                                        <div class="col-md-3">
+                                            <label class="form-label">Start</label>
+                                            <InputDate class="form-control" @bind-Value="sel.StartDate" />
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Due</label>
+                                            <InputDate class="form-control" @bind-Value="sel.DueDate" />
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Status</label>
+                                            <InputSelect class="form-select" @bind-Value="sel.Status">
+                                                <option value="">— wählen —</option>
+                                                <option value="Grün">Grün</option>
+                                                <option value="Gelb">Gelb</option>
+                                                <option value="Rot">Rot</option>
+                                                <option value="Geplant">Geplant</option>
+                                            </InputSelect>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Verantwortlicher</label>
+                                            <InputSelect class="form-select" @bind-Value="sel.VerantwortlicherbenutzerId">
+                                                <option value="0">-- auswählen --</option>
+                                                @foreach (var u in allUsers)
+                                                {
+                                                    <option value="@u.Id">@u.Email</option>
+                                                }
+                                            </InputSelect>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseModal">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary">Speichern</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // Lokaler Binder für das Textfeld — vermeidet Bind an Ausdruck (rvalue) und schützt vor null editModel.
+    private string EditProjektbeschreibung
+    {
+        get => editModel?.Projektbeschreibung ?? string.Empty;
+        set
+        {
+            if (editModel != null)
+            {
+                editModel.Projektbeschreibung = value;
+            }
+        }
+    }
+
+    // Adapter-Methode für OnValidSubmit: stellt sicher, dass Signatur/Returntyp korrekt ist.
+    private async Task OnValidSubmitHandler()
+    {
+        // SaveEditAsync befindet sich in der Code-Behind-Datei (.razor.cs).
+        // Falls SaveEditAsync Parameter benötigt oder einen anderen Rückgabetyp liefert,
+        // muss die Adapterlogik hier entsprechend angepasst werden.
+        await SaveEditAsync();
+    }
+}
+
+<style>
+    .timeline { align-items:center; }
+</style>
