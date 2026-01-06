@@ -254,6 +254,9 @@ namespace ProActive2508.Data
                 a.Property(x => x.ProjektId)
                  .IsRequired(false);
 
+                a.Property(x => x.ProjektPhasenId)
+                 .IsRequired(false);
+
                 a.Property(x => x.BenutzerId).IsRequired();
 
                 a.Property(x => x.Aufgabenbeschreibung)

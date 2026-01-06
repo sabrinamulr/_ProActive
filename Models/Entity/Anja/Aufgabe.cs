@@ -17,6 +17,9 @@ namespace ProActive2508.Models.Entity.Anja
         // NULL = kein Projekt ausgewählt
         public int? ProjektId { get; set; }
 
+        // FK (optional): Zugehoerige Projektphase
+        public int? ProjektPhasenId { get; set; }
+
         // FK: Wer ist zuständig?
         [Required]
         public int BenutzerId { get; set; }
@@ -49,6 +52,10 @@ namespace ProActive2508.Models.Entity.Anja
         [ForeignKey(nameof(BenutzerId))]
         [InverseProperty(nameof(Benutzer.Aufgaben))]
         public Benutzer? Benutzer { get; set; }
+
+        [ForeignKey(nameof(ProjektPhasenId))]
+        [InverseProperty(nameof(ProjektPhase.Aufgaben))]
+        public ProjektPhase? ProjektPhase { get; set; }
 
     }
 
