@@ -3,37 +3,21 @@
 window.renderRatingChart = function (data) {
     console.log("renderRatingChart wurde aufgerufen:", data);
 
-    const ctx = document.getElementById('ratingChart');
-    if (!ctx) {
+    const canvas = document.getElementById('ratingChart');
+    if (!canvas) {
         console.error("Canvas 'ratingChart' nicht gefunden!");
         return;
     }
 
-    // Falls bereits ein Chart existiert → zerstören
-    if (window.ratingChartInstance) {
-        window.ratingChartInstance.destroy();
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        console.error("Kein 2D-Kontext für Canvas gefunden!");
+        return;
     }
 
-    window.ratingChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: ["1 Stern", "2 Sterne", "3 Sterne", "4 Sterne", "5 Sterne"],
-            datasets: [{
-                label: 'Anzahl Bewertungen',
-                data: data,
-                backgroundColor: [
-                    '#d9534f',
-                    '#f0ad4e',
-                    '#ffd700',
-                    '#5bc0de',
-                    '#5cb85c'
-                ]
-            }]
-        },
-        options: {
-            scales: {
-                y: { beginAtZero: true }
-            }
-        }
-    });
+    // TEST: Einfach nur den Hintergrund rot füllen, ohne Chart.js
+    ctx.fillStyle = 'red';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    console.log("Test-Rechteck gezeichnet.");
 };
