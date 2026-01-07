@@ -475,7 +475,7 @@ app.MapPost("/auth/logout", async (HttpContext http) =>
 .DisableAntiforgery();
 
 // Razor Components
-app.MapRazorComponents<App>()
+app.MapRazorComponents<App>() 
    .AddInteractiveServerRenderMode();
 
 await app.RunAsync();
