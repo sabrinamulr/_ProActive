@@ -304,15 +304,19 @@ using (var scope = app.Services.CreateScope())
         await db.SaveChangesAsync();
     }
 
+    DateTime seedMonday = DateTime.Today;
+    int seedDiff = (7 + (int)seedMonday.DayOfWeek - (int)DayOfWeek.Monday) % 7;
+    seedMonday = seedMonday.AddDays(-seedDiff);
+
     // ---------- Menueplan-Tage ----------
     if (!await db.MenueplanTage.AnyAsync())
     {
         db.MenueplanTage.AddRange(
-            new MenueplanTag { Tag = new DateTime(2025, 9, 1) },
-            new MenueplanTag { Tag = new DateTime(2025, 9, 2) },
-            new MenueplanTag { Tag = new DateTime(2025, 9, 3) },
-            new MenueplanTag { Tag = new DateTime(2025, 9, 4) },
-            new MenueplanTag { Tag = new DateTime(2025, 9, 5) }
+            new MenueplanTag { Tag = seedMonday },
+            new MenueplanTag { Tag = seedMonday.AddDays(1) },
+            new MenueplanTag { Tag = seedMonday.AddDays(2) },
+            new MenueplanTag { Tag = seedMonday.AddDays(3) },
+            new MenueplanTag { Tag = seedMonday.AddDays(4) }
         );
         await db.SaveChangesAsync();
     }
@@ -324,11 +328,11 @@ using (var scope = app.Services.CreateScope())
         var gerichtByName = await db.Gerichte.ToDictionaryAsync(g => g.Gerichtname, g => g.Id);
 
         db.Menueplaene.AddRange(
-            new Menueplan { MenueplanTagId = tagByDate[new DateTime(2025, 9, 1)], PositionNr = 1, GerichtId = gerichtByName["Spaghetti Bolognese"] },
-            new Menueplan { MenueplanTagId = tagByDate[new DateTime(2025, 9, 1)], PositionNr = 2, GerichtId = gerichtByName["Veggie Bowl"] },
-            new Menueplan { MenueplanTagId = tagByDate[new DateTime(2025, 9, 2)], PositionNr = 1, GerichtId = gerichtByName["Hühnchen Curry"] },
-            new Menueplan { MenueplanTagId = tagByDate[new DateTime(2025, 9, 2)], PositionNr = 2, GerichtId = gerichtByName["Käse-Spätzle"] },
-            new Menueplan { MenueplanTagId = tagByDate[new DateTime(2025, 9, 3)], PositionNr = 1, GerichtId = gerichtByName["Rindergulasch"] }
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday], PositionNr = 1, GerichtId = gerichtByName["Spaghetti Bolognese"] },
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday], PositionNr = 2, GerichtId = gerichtByName["Veggie Bowl"] },
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(1)], PositionNr = 1, GerichtId = gerichtByName["Hühnchen Curry"] },
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(1)], PositionNr = 2, GerichtId = gerichtByName["Käse-Spätzle"] },
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(2)], PositionNr = 1, GerichtId = gerichtByName["Rindergulasch"] }
         );
         await db.SaveChangesAsync();
     }
@@ -344,11 +348,11 @@ using (var scope = app.Services.CreateScope())
             => entries.First(e => e.MenueplanTagId == tagByDate[date.Date] && e.PositionNr == pos).Id;
 
         db.Vorbestellungen.AddRange(
-            new Vorbestellung { BenutzerId = benutzerByPn[1001], MenueplanTagId = tagByDate[new DateTime(2025, 9, 1)], EintragId = EintragIdFor(new DateTime(2025, 9, 1), 1) },
-            new Vorbestellung { BenutzerId = benutzerByPn[1002], MenueplanTagId = tagByDate[new DateTime(2025, 9, 1)], EintragId = EintragIdFor(new DateTime(2025, 9, 1), 2) },
-            new Vorbestellung { BenutzerId = benutzerByPn[1003], MenueplanTagId = tagByDate[new DateTime(2025, 9, 2)], EintragId = EintragIdFor(new DateTime(2025, 9, 2), 1) },
-            new Vorbestellung { BenutzerId = benutzerByPn[1004], MenueplanTagId = tagByDate[new DateTime(2025, 9, 2)], EintragId = EintragIdFor(new DateTime(2025, 9, 2), 2) },
-            new Vorbestellung { BenutzerId = benutzerByPn[1005], MenueplanTagId = tagByDate[new DateTime(2025, 9, 3)], EintragId = EintragIdFor(new DateTime(2025, 9, 3), 1) }
+            new Vorbestellung { BenutzerId = benutzerByPn[1001], MenueplanTagId = tagByDate[seedMonday], EintragId = EintragIdFor(seedMonday, 1) },
+            new Vorbestellung { BenutzerId = benutzerByPn[1002], MenueplanTagId = tagByDate[seedMonday], EintragId = EintragIdFor(seedMonday, 2) },
+            new Vorbestellung { BenutzerId = benutzerByPn[1003], MenueplanTagId = tagByDate[seedMonday.AddDays(1)], EintragId = EintragIdFor(seedMonday.AddDays(1), 1) },
+            new Vorbestellung { BenutzerId = benutzerByPn[1004], MenueplanTagId = tagByDate[seedMonday.AddDays(1)], EintragId = EintragIdFor(seedMonday.AddDays(1), 2) },
+            new Vorbestellung { BenutzerId = benutzerByPn[1005], MenueplanTagId = tagByDate[seedMonday.AddDays(2)], EintragId = EintragIdFor(seedMonday.AddDays(2), 1) }
         );
         await db.SaveChangesAsync();
     }
