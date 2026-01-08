@@ -23,9 +23,12 @@ public partial class NavMenu : ComponentBase
         {
             try
             {
-                HasDiese = await WeekService.WeekHasPlanAsync(0);
-                HasNaechste = await WeekService.WeekHasPlanAsync(1);
-                HasIn2 = await WeekService.WeekHasPlanAsync(2);
+                //HasDiese = await WeekService.WeekHasPlanAsync(0);
+                //HasNaechste = await WeekService.WeekHasPlanAsync(1);
+                //HasIn2 = await WeekService.WeekHasPlanAsync(2);
+                HasDiese = false;
+                HasNaechste = false;
+                HasIn2 = false;
             }
             catch
             {

@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore.Antiforgery;                              // IAntiforgery
+﻿using Blazorise;
+using Blazorise.Bootstrap5;
+using Blazorise.Icons.FontAwesome;
+using Microsoft.AspNetCore.Antiforgery;                              // IAntiforgery
 using Microsoft.AspNetCore.Authentication;                           // SignInAsync/SignOutAsync
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
@@ -11,6 +14,7 @@ using ProActive2508.Models.Entity.Anja;
 using ProActive2508.Models.Entity.Anja.Kantine;
 using ProActive2508.Service;
 using QuestPDF.Infrastructure;
+using Radzen;
 using System.Security.Claims;
 
 
@@ -27,6 +31,7 @@ QuestPDF.Settings.License = LicenseType.Community;
 builder.Services.AddSingleton<IMenuplanPdfService, MenuplanPdfService>();
 
 builder.Services.AddScoped<Umfrage>();
+builder.Services.AddRadzenComponents();
 
 // Cookies
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -248,7 +253,7 @@ using (var scope = app.Services.CreateScope())
         await db.SaveChangesAsync();
     }
 
-    // ---------- Allergene ----------
+    //    // ---------- Allergene ----------
     if (!await db.Allergene.AnyAsync())
     {
         db.Allergene.AddRange(
@@ -378,124 +383,125 @@ using (var scope = app.Services.CreateScope())
 // ======== AUTH ENDPOINTS ========
 
 app.MapPost("/auth/login", async (
-    HttpContext http,
-    IAntiforgery antiforgery,
-    AppDbContext db,
-    IPasswordHasher<Benutzer> hasher,
-    [FromForm] LoginInput input) =>
-{
-    await antiforgery.ValidateRequestAsync(http); // CSRF-Check
-
-    var user = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == input.Personalnummer);
-    var pwd = (input.Password ?? string.Empty).Trim();
-    if (user is null || string.IsNullOrWhiteSpace(user.PasswordHash)) return Results.Redirect("/auth/login?err=1");
-
-    var verify = hasher.VerifyHashedPassword(user, user.PasswordHash, pwd);
-    if (verify == PasswordVerificationResult.Failed) return Results.Redirect("/auth/login?err=1");
-
-    if (verify == PasswordVerificationResult.SuccessRehashNeeded)
+        HttpContext http,
+        IAntiforgery antiforgery,
+        AppDbContext db,
+        IPasswordHasher<Benutzer> hasher,
+        [FromForm] LoginInput input) =>
     {
-        var tracked = await db.Benutzer.FirstAsync(b => b.Id == user.Id);
-        tracked.PasswordHash = hasher.HashPassword(tracked, pwd);
-        await db.SaveChangesAsync();
-    }
+        await antiforgery.ValidateRequestAsync(http); // CSRF-Check
 
-    var claims = new List<Claim>
-    {
+        var user = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == input.Personalnummer);
+        var pwd = (input.Password ?? string.Empty).Trim();
+        if (user is null || string.IsNullOrWhiteSpace(user.PasswordHash)) return Results.Redirect("/auth/login?err=1");
+
+        var verify = hasher.VerifyHashedPassword(user, user.PasswordHash, pwd);
+        if (verify == PasswordVerificationResult.Failed) return Results.Redirect("/auth/login?err=1");
+
+        if (verify == PasswordVerificationResult.SuccessRehashNeeded)
+        {
+            var tracked = await db.Benutzer.FirstAsync(b => b.Id == user.Id);
+            tracked.PasswordHash = hasher.HashPassword(tracked, pwd);
+            await db.SaveChangesAsync();
+        }
+
+        var claims = new List<Claim>
+        {
         new(ClaimTypes.NameIdentifier, user.Id.ToString()),
         new(ClaimTypes.Name, string.IsNullOrWhiteSpace(user.Email) ? user.Personalnummer.ToString() : user.Email),
         new(ClaimTypes.Email, user.Email ?? string.Empty),
-    };
+        };
 
-    if (!string.IsNullOrWhiteSpace(user.Stufe))
-    {
-        var roles = user.Stufe.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                              .Where(r => !string.IsNullOrWhiteSpace(r))
-                              .Distinct(StringComparer.OrdinalIgnoreCase);
-        foreach (var role in roles) claims.Add(new Claim(ClaimTypes.Role, role));
-    }
-
-    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name, ClaimTypes.Role);
-    var principal = new ClaimsPrincipal(identity);
-
-    // Altes Cookie weg
-    await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
-    var props = new AuthenticationProperties(); // NICHT persistent → Session-Cookie
-    await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, props);
-
-    // ⬅️ WICHTIG: Session-Flag setzen → markiert laufende Browsersitzung
-    http.Session.SetString("SessionAlive", "1");
-
-    return Results.Redirect("/");
-});
-
-app.MapPost("/auth/change-password", async (HttpContext http, IAntiforgery antiforgery, AppDbContext db, IPasswordHasher<Benutzer> hasher) =>
-{
-    await antiforgery.ValidateRequestAsync(http);
-    if (http.User?.Identity?.IsAuthenticated != true) return Results.Redirect("/changepassword?err=auth");
-
-    var form = await http.Request.ReadFormAsync();
-    var curr = form["AktuellesPasswort"].ToString();
-    var neu = form["NeuesPasswort"].ToString();
-    var neu2 = form["NeuesPasswortBestaetigt"].ToString();
-
-    if (string.IsNullOrWhiteSpace(curr) || string.IsNullOrWhiteSpace(neu) || string.IsNullOrWhiteSpace(neu2)) return Results.Redirect("/auth/changepassword?err=unk");
-    if (neu != neu2) return Results.Redirect("/auth/changepassword?err=cmp");
-    if (neu.Length < 8) return Results.Redirect("/auth/changepassword?err=unk");
-
-    int? currentUserId = null;
-    var idStr = http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? http.User.FindFirst("sub")?.Value;
-    if (int.TryParse(idStr, out var idFromClaim)) currentUserId = idFromClaim;
-    else
-    {
-        var name = http.User.Identity?.Name;
-        if (!string.IsNullOrWhiteSpace(name))
+        if (!string.IsNullOrWhiteSpace(user.Stufe))
         {
-            if (int.TryParse(name, out var personalnummer))
+            var roles = user.Stufe.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                  .Where(r => !string.IsNullOrWhiteSpace(r))
+                                  .Distinct(StringComparer.OrdinalIgnoreCase);
+            foreach (var role in roles) claims.Add(new Claim(ClaimTypes.Role, role));
+        }
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name, ClaimTypes.Role);
+        var principal = new ClaimsPrincipal(identity);
+
+        // Altes Cookie weg
+        await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        var props = new AuthenticationProperties(); // NICHT persistent → Session-Cookie
+        await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, props);
+
+        // ⬅️ WICHTIG: Session-Flag setzen → markiert laufende Browsersitzung
+        http.Session.SetString("SessionAlive", "1");
+
+        return Results.Redirect("/");
+    });
+
+    app.MapPost("/auth/change-password", async (HttpContext http, IAntiforgery antiforgery, AppDbContext db, IPasswordHasher<Benutzer> hasher) =>
+    {
+        await antiforgery.ValidateRequestAsync(http);
+        if (http.User?.Identity?.IsAuthenticated != true) return Results.Redirect("/changepassword?err=auth");
+
+        var form = await http.Request.ReadFormAsync();
+        var curr = form["AktuellesPasswort"].ToString();
+        var neu = form["NeuesPasswort"].ToString();
+        var neu2 = form["NeuesPasswortBestaetigt"].ToString();
+
+        if (string.IsNullOrWhiteSpace(curr) || string.IsNullOrWhiteSpace(neu) || string.IsNullOrWhiteSpace(neu2)) return Results.Redirect("/auth/changepassword?err=unk");
+        if (neu != neu2) return Results.Redirect("/auth/changepassword?err=cmp");
+        if (neu.Length < 8) return Results.Redirect("/auth/changepassword?err=unk");
+
+        int? currentUserId = null;
+        var idStr = http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? http.User.FindFirst("sub")?.Value;
+        if (int.TryParse(idStr, out var idFromClaim)) currentUserId = idFromClaim;
+        else
+        {
+            var name = http.User.Identity?.Name;
+            if (!string.IsNullOrWhiteSpace(name))
             {
-                var dbUserByPn = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == personalnummer);
-                currentUserId = dbUserByPn?.Id;
-            }
-            else
-            {
-                var dbUserByMail = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
-                currentUserId = dbUserByMail?.Id;
+                if (int.TryParse(name, out var personalnummer))
+                {
+                    var dbUserByPn = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == personalnummer);
+                    currentUserId = dbUserByPn?.Id;
+                }
+                else
+                {
+                    var dbUserByMail = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
+                    currentUserId = dbUserByMail?.Id;
+                }
             }
         }
-    }
-    if (currentUserId is null) return Results.Redirect("/auth/changepassword?err=auth");
+        if (currentUserId is null) return Results.Redirect("/auth/changepassword?err=auth");
 
-    var user = await db.Benutzer.FirstOrDefaultAsync(b => b.Id == currentUserId.Value);
-    if (user is null) return Results.Redirect("/auth/changepassword?err=auth");
+        var user = await db.Benutzer.FirstOrDefaultAsync(b => b.Id == currentUserId.Value);
+        if (user is null) return Results.Redirect("/auth/changepassword?err=auth");
 
-    var verify = hasher.VerifyHashedPassword(user, user.PasswordHash, curr);
-    if (verify == PasswordVerificationResult.Failed) return Results.Redirect("/auth/changepassword?err=pw");
+        var verify = hasher.VerifyHashedPassword(user, user.PasswordHash, curr);
+        if (verify == PasswordVerificationResult.Failed) return Results.Redirect("/auth/changepassword?err=pw");
 
-    user.PasswordHash = hasher.HashPassword(user, neu);
-    await db.SaveChangesAsync();
+        user.PasswordHash = hasher.HashPassword(user, neu);
+        await db.SaveChangesAsync();
 
-    return Results.Redirect("/auth/changepassword?ok=1");
-}).RequireAuthorization();
+        return Results.Redirect("/auth/changepassword?ok=1");
+    }).RequireAuthorization();
 
-app.MapPost("/auth/logout", async (HttpContext http) =>
-{
-    await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-    http.Session.Clear();
-
-    // sendBeacon/fetch(keepalive) kann Redirects nicht folgen → 204 zurückgeben
-    // Bei echter Navigation (z.B. Logout-Button im UI) kannst du redirecten:
-    if (string.Equals(http.Request.Headers["Sec-Fetch-Mode"], "navigate", StringComparison.OrdinalIgnoreCase))
+    app.MapPost("/auth/logout", async (HttpContext http) =>
     {
-        return Results.Redirect("/auth/login?logout=1");
-    }
+        await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        http.Session.Clear();
 
-    return Results.NoContent(); // 204
-})
-.DisableAntiforgery();
+        // sendBeacon/fetch(keepalive) kann Redirects nicht folgen → 204 zurückgeben
+        // Bei echter Navigation (z.B. Logout-Button im UI) kannst du redirecten:
+        if (string.Equals(http.Request.Headers["Sec-Fetch-Mode"], "navigate", StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Redirect("/auth/login?logout=1");
+        }
 
-// Razor Components
-app.MapRazorComponents<App>() 
-   .AddInteractiveServerRenderMode();
+        return Results.NoContent(); // 204
+    })
+    .DisableAntiforgery();
 
-await app.RunAsync();
+    // Razor Components
+    app.MapRazorComponents<App>()
+       .AddInteractiveServerRenderMode();
+
+    await app.RunAsync();
+
