@@ -10,7 +10,13 @@ namespace ProActive2508.Service
     public class KantineWeekService : IKantineWeekService
     {
         private readonly IServiceScopeFactory _scopeFactory;
-        public KantineWeekService(IServiceScopeFactory scopeFactory) => _scopeFactory = scopeFactory;
+        private readonly ILogger<KantineWeekService> _logger;
+
+        public KantineWeekService(IServiceScopeFactory scopeFactory, ILogger<KantineWeekService> logger)
+        {
+            _scopeFactory = scopeFactory;
+            _logger = logger;
+        }
 
         public (DateTime Monday, DateTime Friday) GetWeekRange(DateTime reference, int Wunschwoche)
         {
@@ -26,11 +32,19 @@ namespace ProActive2508.Service
             using IServiceScope scope = _scopeFactory.CreateScope();
             AppDbContext db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            (DateTime mo, DateTime fr) = GetWeekRange(DateTime.Today, Wunschwoche);
-            return await db.Menueplaene
-                .AsNoTracking()
-                .Include(m => m.MenueplanTag)
-                .AnyAsync(m => m.MenueplanTag.Tag >= mo && m.MenueplanTag.Tag <= fr, ct);
+            try
+            {
+                (DateTime mo, DateTime fr) = GetWeekRange(DateTime.Today, Wunschwoche);
+                return await db.Menueplaene
+                    .AsNoTracking()
+                    .Include(m => m.MenueplanTag)
+                    .AnyAsync(m => m.MenueplanTag.Tag >= mo && m.MenueplanTag.Tag <= fr, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "WeekHasPlanAsync failed for offset {OffsetWeeks}.", Wunschwoche);
+                return false;
+            }
         }
 
         public async Task<List<MenueplanTag>> LoadWeekAsync(int WunschWoche, CancellationToken ct = default)

@@ -327,13 +327,29 @@ using (var scope = app.Services.CreateScope())
         var tagByDate = await db.MenueplanTage.ToDictionaryAsync(t => t.Tag.Date, t => t.Id);
         var gerichtByName = await db.Gerichte.ToDictionaryAsync(g => g.Gerichtname, g => g.Id);
 
+        // ✅ Diese Woche: Montag–Freitag → JEDER Tag hat 2 Menüs (PositionNr 1 & 2)
         db.Menueplaene.AddRange(
-            new Menueplan { MenueplanTagId = tagByDate[seedMonday], PositionNr = 1, GerichtId = gerichtByName["Spaghetti Bolognese"] },
-            new Menueplan { MenueplanTagId = tagByDate[seedMonday], PositionNr = 2, GerichtId = gerichtByName["Veggie Bowl"] },
-            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(1)], PositionNr = 1, GerichtId = gerichtByName["Hühnchen Curry"] },
-            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(1)], PositionNr = 2, GerichtId = gerichtByName["Käse-Spätzle"] },
-            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(2)], PositionNr = 1, GerichtId = gerichtByName["Rindergulasch"] }
+            // Montag
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.Date], PositionNr = 1, GerichtId = gerichtByName["Spaghetti Bolognese"] },
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.Date], PositionNr = 2, GerichtId = gerichtByName["Veggie Bowl"] },
+
+            // Dienstag
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(1).Date], PositionNr = 1, GerichtId = gerichtByName["Hühnchen Curry"] },
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(1).Date], PositionNr = 2, GerichtId = gerichtByName["Käse-Spätzle"] },
+
+            // Mittwoch
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(2).Date], PositionNr = 1, GerichtId = gerichtByName["Rindergulasch"] },
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(2).Date], PositionNr = 2, GerichtId = gerichtByName["Veggie Bowl"] },
+
+            // Donnerstag
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(3).Date], PositionNr = 1, GerichtId = gerichtByName["Spaghetti Bolognese"] },
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(3).Date], PositionNr = 2, GerichtId = gerichtByName["Käse-Spätzle"] },
+
+            // Freitag
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(4).Date], PositionNr = 1, GerichtId = gerichtByName["Hühnchen Curry"] },
+            new Menueplan { MenueplanTagId = tagByDate[seedMonday.AddDays(4).Date], PositionNr = 2, GerichtId = gerichtByName["Veggie Bowl"] }
         );
+
         await db.SaveChangesAsync();
     }
 
