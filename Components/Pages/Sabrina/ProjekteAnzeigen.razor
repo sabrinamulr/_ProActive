@@ -29,10 +29,9 @@ else
                 <tr>
                     <th style="width:70px;">Id</th>
                     <th>Projekt</th>
-                    <th style="min-width:320px;">Aktuelle Phase / Phasenverlauf</th>
+                    <th style="min-width:320px;">Aktuelle Phase</th>
                     <th style="width:220px;">Projektleiter</th>
                     <th style="width:220px;">Auftraggeber</th>
-                    <th style="width:140px;">Aktion</th>
                 </tr>
             </thead>
             <tbody>
@@ -45,7 +44,6 @@ else
                             <div class="text-muted small">@p.Projektbeschreibung</div>
                         </td>
                         <td>
-                            @* Zeige für alle (auch Projektleiter) die tatsächliche aktuelle ProjektPhase aus ProjektPhase *@
                             @{
                                 var cur = currentPhaseLookup.TryGetValue(p.Id, out var c) ? c : null;
                                 var all = projectPhasesLookup.TryGetValue(p.Id, out var phases) ? phases : new List<ProjektPhase>();
@@ -61,7 +59,6 @@ else
                                     <div class="small text-muted">@($"{cur.StartDate:dd.MM.yyyy} – {cur.DueDate:dd.MM.yyyy}")</div>
                                 </div>
 
-                                @* Simple timeline/progress bar: equal segments for phases, highlight current *@
                                 <div class="timeline d-flex" style="gap:6px;">
                                     @if (all == null || !all.Any())
                                     {
@@ -86,7 +83,7 @@ else
                         <td>
                             @if (CanEdit(p))
                             {
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="async () => await OpenEditModal(p.Id)">Bearbeiten</button>
+                                <a class="btn btn-sm btn-outline-primary" href="@($"/projekt/{p.Id}")">Details</a>
                             }
                             else
                             {
@@ -100,102 +97,3 @@ else
     </div>
 }
 
-@if (isModalOpen)
-{
-    <div class="modal-backdrop show"></div>
-    <div class="modal show d-block" tabindex="-1" style="--bs-modal-width: 720px;">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header py-2">
-                    <h5 class="modal-title">@modalTitle</h5>
-                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
-                </div>
-
-                <EditForm Model="editModel" OnValidSubmit="OnValidSubmitHandler" FormName="ProjektEditForm">
-                    <DataAnnotationsValidator />
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Beschreibung</label>
-                            <InputTextArea class="form-control" @bind-Value="EditProjektbeschreibung" rows="4" />
-                        </div>
-
-                        @if (editPhaseSelections != null && editPhaseSelections.Any())
-                        {
-                            <hr />
-                            <h6>Phasen</h6>
-                            @foreach (var sel in editPhaseSelections)
-                            {
-                                <div class="mb-2">
-                                    <div class="fw-semibold">@sel.PhaseKurz</div>
-                                    <div class="row g-2 mt-1">
-                                        <div class="col-md-3">
-                                            <label class="form-label">Start</label>
-                                            <InputDate class="form-control" @bind-Value="sel.StartDate" />
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">Due</label>
-                                            <InputDate class="form-control" @bind-Value="sel.DueDate" />
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">Status</label>
-                                            <InputSelect class="form-select" @bind-Value="sel.Status">
-                                                <option value="">— wählen —</option>
-                                                <option value="Grün">Grün</option>
-                                                <option value="Gelb">Gelb</option>
-                                                <option value="Rot">Rot</option>
-                                                <option value="Geplant">Geplant</option>
-                                            </InputSelect>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">Verantwortlicher</label>
-                                            <InputSelect class="form-select" @bind-Value="sel.VerantwortlicherbenutzerId">
-                                                <option value="0">-- auswählen --</option>
-                                                @foreach (var u in allUsers)
-                                                {
-                                                    <option value="@u.Id">@u.Email</option>
-                                                }
-                                            </InputSelect>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
-                        }
-                    </div>
-
-                    <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseModal">Abbrechen</button>
-                        <button type="submit" class="btn btn-primary">Speichern</button>
-                    </div>
-                </EditForm>
-            </div>
-        </div>
-    </div>
-}
-
-@code {
-    // Lokaler Binder für das Textfeld — vermeidet Bind an Ausdruck (rvalue) und schützt vor null editModel.
-    private string EditProjektbeschreibung
-    {
-        get => editModel?.Projektbeschreibung ?? string.Empty;
-        set
-        {
-            if (editModel != null)
-            {
-                editModel.Projektbeschreibung = value;
-            }
-        }
-    }
-
-    // Adapter-Methode für OnValidSubmit: stellt sicher, dass Signatur/Returntyp korrekt ist.
-    private async Task OnValidSubmitHandler()
-    {
-        // SaveEditAsync befindet sich in der Code-Behind-Datei (.razor.cs).
-        // Falls SaveEditAsync Parameter benötigt oder einen anderen Rückgabetyp liefert,
-        // muss die Adapterlogik hier entsprechend angepasst werden.
-        await SaveEditAsync();
-    }
-}
-
-<style>
-    .timeline { align-items:center; }
-</style>

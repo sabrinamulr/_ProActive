@@ -1,0 +1,93 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using ProActive2508.Models.Entity.Anja
+@using ProActive2508.Data
+
+
+@if (ProjectId == 0)
+{
+    @* nicht sichtbar *@
+}
+else
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1" style="--bs-modal-width: 720px;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h5 class="modal-title">Projekt bearbeiten</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="Cancel"></button>
+                </div>
+
+                @if (isLoading)
+                {
+                    <div class="modal-body"><p>Lade…</p></div>
+                }
+                else if (!string.IsNullOrEmpty(uiError))
+                {
+                    <div class="modal-body">
+                        <div class="alert alert-warning">@uiError</div>
+                    </div>
+                }
+                else if (editModel != null)
+                {
+                    <EditForm Model="editModel" OnValidSubmit="SaveAsync" FormName="ProjektEditForm">
+                        <DataAnnotationsValidator />
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Beschreibung</label>
+                                <InputTextArea class="form-control" @bind-Value="editModel.Projektbeschreibung" rows="4" />
+                            </div>
+
+                            @if (editPhaseSelections != null && editPhaseSelections.Any())
+                            {
+                                <hr />
+                                <h6>Phasen</h6>
+                                @foreach (var sel in editPhaseSelections)
+                                {
+                                    <div class="mb-2">
+                                        <div class="fw-semibold">@sel.PhaseKurz</div>
+                                        <div class="row g-2 mt-1">
+                                            <div class="col-md-3">
+                                                <label class="form-label">Start</label>
+                                                <InputDate class="form-control" @bind-Value="sel.StartDate" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Due</label>
+                                                <InputDate class="form-control" @bind-Value="sel.DueDate" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Status</label>
+                                                <InputSelect class="form-select" @bind-Value="sel.Status">
+                                                    <option value="">— wählen —</option>
+                                                    <option value="Grün">Grün</option>
+                                                    <option value="Gelb">Gelb</option>
+                                                    <option value="Rot">Rot</option>
+                                                    <option value="Geplant">Geplant</option>
+                                                </InputSelect>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Verantwortlicher</label>
+                                                <InputSelect class="form-select" @bind-Value="sel.VerantwortlicherBenutzerId">
+                                                    <option value="0">-- auswählen --</option>
+                                                    @foreach (var u in allUsers)
+                                                    {
+                                                        <option value="@u.Id">@u.Email</option>
+                                                    }
+                                                </InputSelect>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="modal-footer py-2">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Abbrechen</button>
+                            <button type="submit" class="btn btn-primary" disabled="@isSaving">Speichern</button>
+                        </div>
+                    </EditForm>
+                }
+            </div>
+        </div>
+    </div>
+}

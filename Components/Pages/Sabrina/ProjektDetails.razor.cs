@@ -18,13 +18,15 @@ namespace ProActive2508.Components.Pages.Sabrina
         protected Projekt? editModel;
         protected bool isLoading = true;
         protected bool isEditing = false;
-        protected bool CanEdit = false;
         protected Dictionary<int, string> _userLookup = new();
 
         // neu: Phasen-Daten & Rollenflag
         protected List<ProjektPhase>? projectPhases;
         protected ProjektPhase? currentPhase;
         protected bool isProjektleiterRole = false;
+
+        // neu: aktuelle Benutzer-Id speichern
+        private int CurrentUserId;
 
         [Inject] private AppDbContext Db { get; set; } = default!;
         [CascadingParameter] private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
@@ -60,6 +62,9 @@ namespace ProActive2508.Components.Pages.Sabrina
                     }
                 }
 
+                // speichere die aktuelle BenutzerId für spätere Berechnungen
+                CurrentUserId = currentUserId;
+
                 project = await Db.Projekte.AsNoTracking().FirstOrDefaultAsync(p => p.Id == Id);
                 if (project is null)
                 {
@@ -67,7 +72,6 @@ namespace ProActive2508.Components.Pages.Sabrina
                     _userLookup = new Dictionary<int, string>();
                     projectPhases = new List<ProjektPhase>();
                     currentPhase = null;
-                    CanEdit = false;
                     isProjektleiterRole = false;
                     return;
                 }
@@ -89,7 +93,7 @@ namespace ProActive2508.Components.Pages.Sabrina
 
                 // Berechtigung prüfen: Rolle Projektleiter oder spezifischer Projektleiter
                 isProjektleiterRole = user.IsInRole("Projektleiter");
-                CanEdit = isProjektleiterRole || project.ProjektleiterId == currentUserId;
+                // note: CanEdit wird über Methode berechnet (siehe unten)
 
                 // Phasen + aktuelle Phase laden
                 projectPhases = await Db.ProjektPhasen
@@ -133,7 +137,6 @@ namespace ProActive2508.Components.Pages.Sabrina
                 _userLookup = new Dictionary<int, string>();
                 projectPhases = new List<ProjektPhase>();
                 currentPhase = null;
-                CanEdit = false;
                 isProjektleiterRole = false;
             }
             finally
@@ -142,20 +145,35 @@ namespace ProActive2508.Components.Pages.Sabrina
             }
         }
 
+        // Methode zur Berechnung der Bearbeitungsberechtigung (wird in Razor aufgerufen)
+        protected bool CanEdit(Projekt? p)
+        {
+            if (p is null) return false;
+            return isProjektleiterRole || p.ProjektleiterId == CurrentUserId;
+        }
+
         protected void EnableEdit()
         {
-            if (project is null) return;
-            editModel = new Projekt
+            if (project is null)
             {
-                Id = project.Id,
-                Projektbeschreibung = project.Projektbeschreibung,
-                BenutzerId = project.BenutzerId,
-                ProjektleiterId = project.ProjektleiterId,
-                AuftraggeberId = project.AuftraggeberId,
-                Status = project.Status,
-                Phase = project.Phase
-            };
-            isEditing = true;
+                return;
+            }
+            else 
+            {
+                editModel = new Projekt
+                {
+                    Id = project.Id,
+                    Projektbeschreibung = project.Projektbeschreibung,
+                    BenutzerId = project.BenutzerId,
+                    ProjektleiterId = project.ProjektleiterId,
+                    AuftraggeberId = project.AuftraggeberId,
+                    Status = project.Status,
+                    Phase= project.Phase, 
+                    //PhaseDefinition = project.PhaseDefinition, // Optional, falls benötigt
+                };
+                isEditing = true;
+            }
+                
         }
 
         protected async Task SaveAsync()

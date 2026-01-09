@@ -74,7 +74,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                         ExistingId = ex?.Id ?? 0,
                         StartDate = ex?.StartDate ?? DateTime.Today,
                         DueDate = ex?.DueDate ?? DateTime.Today.AddDays(14),
-                        VerantwortlicherbenutzerId = ex?.VerantwortlicherbenutzerId ?? project.ProjektleiterId,
+                        VerantwortlicherBenutzerId = ex?.VerantwortlicherbenutzerId ?? project.ProjektleiterId,
                         Notizen = ex?.Notizen,
                         Status = ex?.Status ?? "Geplant",
 
@@ -136,7 +136,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                         {
                             upd.StartDate = sel.StartDate;
                             upd.DueDate = sel.DueDate;
-                            upd.VerantwortlicherbenutzerId = sel.VerantwortlicherbenutzerId;
+                            upd.VerantwortlicherbenutzerId = sel.VerantwortlicherBenutzerId;
                             upd.Notizen = sel.Notizen;
                             upd.Status = sel.Status;
                             Db.ProjektPhasen.Update(upd);
@@ -150,7 +150,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                             PhasenId = sel.Phase.Id,
                             StartDate = sel.StartDate,
                             DueDate = sel.DueDate,
-                            VerantwortlicherbenutzerId = sel.VerantwortlicherbenutzerId,
+                            VerantwortlicherbenutzerId = sel.VerantwortlicherBenutzerId,
                             Status = sel.Status,
                             Notizen = sel.Notizen
                         };
@@ -194,17 +194,23 @@ namespace ProActive2508.Components.Pages.Sabrina
                     Meilenstein? template = meilensteinVorlagen.FirstOrDefault(t => string.Equals(t.Bezeichnung?.Trim(), sel.Phase.Kurzbezeichnung?.Trim(), StringComparison.OrdinalIgnoreCase))
                         ?? meilensteinVorlagen.FirstOrDefault(t => (t.Bezeichnung ?? string.Empty).IndexOf(sel.Phase.Kurzbezeichnung ?? string.Empty, StringComparison.OrdinalIgnoreCase) >= 0);
 
-                    int templateId = template?.Id ?? 0;
+                    // Verwende nur vorhandene Template-IDs (keine Neuanlage). Fallback auf Phase.Id (Seed-Mapping erwartet Id 1-9).
+                    int templateId = template?.Id ?? sel.Phase.Id;
+
+                    // Prüfe, ob die gewählte TemplateId tatsächlich in den vorhandenen Vorlagen existiert.
+                    if (!meilensteinVorlagen.Any(m => m.Id == templateId))
+                    {
+                        uiError = $"Kein gültiges Meilenstein‑Template für Phase '{sel.Phase.Kurzbezeichnung}' vorhanden. Erlaubte Template‑IDs: {string.Join(", ", meilensteinVorlagen.Select(m => m.Id))}.";
+                        isSaving = false;
+                        return;
+                    }
 
                     PhaseMeilenstein? existingPm = existingPhaseMeilensteine.FirstOrDefault(pm => pm.ProjektphasenId == linkedProjektPhase.Id);
 
                     if (existingPm != null)
                     {
                         // Update bestehender PhaseMeilenstein
-                        if (templateId != 0)
-                        {
-                            existingPm.MeilensteinId = templateId;
-                        }
+                        existingPm.MeilensteinId = templateId;
                         existingPm.GenehmigerbenutzerId = sel.MeilensteinGenehmigerId;
                         existingPm.Status = sel.MeilensteinStatus;
                         existingPm.Zieldatum = sel.MeilensteinZieldatum;
@@ -213,7 +219,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                     }
                     else
                     {
-                        // Neues PhaseMeilenstein anlegen
+                        // Neues PhaseMeilenstein anlegen (wird nur gültige MeilensteinId verwenden)
                         PhaseMeilenstein neuPm = new PhaseMeilenstein
                         {
                             ProjektphasenId = linkedProjektPhase.Id,
@@ -266,7 +272,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             public int ExistingId { get; set; }
             public DateTime StartDate { get; set; }
             public DateTime DueDate { get; set; }
-            public int VerantwortlicherbenutzerId { get; set; }
+            public int VerantwortlicherBenutzerId { get; set; }
             public string? Notizen { get; set; }
             public string? Status { get; set; }    // z. B. "Grün"/"Gelb"/"Rot"/"Geplant"
 

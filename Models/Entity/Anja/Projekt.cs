@@ -26,7 +26,7 @@ namespace ProActive2508.Models.Entity.Anja
         public int AuftraggeberId { get; set; }
 
         [Required]
-        public Projektphase Phase { get; set; } = Projektphase.Initialisierung;
+        public int Phase { get; set; }
 
         public int? ProblemId { get; set; }
 

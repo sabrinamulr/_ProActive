@@ -4,7 +4,7 @@
 @attribute [Authorize(Roles = "Projektleiter")]
 @rendermode InteractiveServer
 
-<h3>Phasen definieren / an Projekt anpassen</h3>
+<h3>Phasen definieren</h3>
 
 @if (isLoading)
 {
@@ -63,7 +63,7 @@ else
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label">Verantwortlicher (Phase)</label>
-                                <InputSelect class="form-select" @bind-Value="sel.VerantwortlicherbenutzerId">
+                                <InputSelect class="form-select" @bind-Value="sel.VerantwortlicherBenutzerId">
                                     <option value="0">-- auswählen --</option>
                                     @foreach (Benutzer u in allUsers)
                                     {

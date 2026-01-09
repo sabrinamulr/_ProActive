@@ -55,7 +55,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             await SaveCoreAsync(redirectToPhases: false);
         }
 
-        // Aufruf durch "Erstellen & Phasen definieren"
+        // Aufruf durch "Weiter"
         protected async Task SaveAndDefineAsync()
         {
             await SaveCoreAsync(redirectToPhases: true);
@@ -75,6 +75,10 @@ namespace ProActive2508.Components.Pages.Sabrina
 
             try
             {
+                // Lese die erste Phase aus der DB (feste, vordefinierte Reihenfolge)
+                Phase? firstPhase = await Db.Phasen.AsNoTracking().OrderBy(p => p.Id).FirstOrDefaultAsync();
+                int phaseId = firstPhase.Id; // Dereferenzierung eines möglichen Nullverweises ACHTUNG!!!
+
                 Projekt projekt = new Projekt
                 {
                     BenutzerId = CurrentUserId,
@@ -82,7 +86,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                     AuftraggeberId = CurrentUserId,
                     Projektbeschreibung = model.Name + (string.IsNullOrWhiteSpace(model.Description) ? string.Empty : " — " + model.Description),
                     Status = Projektstatus.Aktiv,
-                    Phase = Projektphase.Initialisierung
+                    Phase = phaseId   
                 };
 
                 Db.Projekte.Add(projekt);

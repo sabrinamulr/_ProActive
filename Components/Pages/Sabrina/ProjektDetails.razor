@@ -3,6 +3,7 @@
 @using ProActive2508.Models.Entity.Anja
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inject NavigationManager Nav
 
 @if (isLoading)
 {
@@ -30,13 +31,8 @@ else
                 <dd class="col-sm-9">@project.Status</dd>
 
                 <dt class="col-sm-3">Phase</dt>
-                <dd class="col-sm-9">@project.Phase</dd>
+                @*<dd class="col-sm-9">@project.PhaseName</dd>   nutzt PhaseDefinition?.Kurzbezeichnung *@
             </dl>
-
-            @if (CanEdit)
-            {
-                <button class="btn btn-outline-secondary" @onclick="EnableEdit">Bearbeiten</button>
-            }
         </div>
     </div>
 
@@ -94,8 +90,36 @@ else
             }
         }
     </div>
+
+    @if (CanEdit(project))
+    {
+        <button class="btn btn-outline-secondary" @onclick="() => editingProjectId = project?.Id ?? 0">Bearbeiten</button>
+    }
+
+    @if (editingProjectId != 0)
+    {
+        <ProjektEdit ProjectId="@editingProjectId" OnSaved="OnModalSaved" OnCancelled="OnModalCancelled" />
+    }
 }
 
 <style>
     .timeline { align-items:center; margin-top:6px; }
 </style>
+
+@code {
+    private int editingProjectId = 0;
+
+    private Task OnModalSaved()
+    {
+        editingProjectId = 0;
+        // reload details
+        Nav.NavigateTo(Nav.Uri, forceLoad: false);
+        return Task.CompletedTask;
+    }
+
+    private Task OnModalCancelled()
+    {
+        editingProjectId = 0;
+        return Task.CompletedTask;
+    }
+}
