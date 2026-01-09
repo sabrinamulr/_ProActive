@@ -3,8 +3,10 @@
 @using ProActive2508.Data
 @using ProActive2508.Models.Entity.Anja
 @using Microsoft.EntityFrameworkCore
+@using Radzen
+@using Radzen.Blazor
+
 @inject AppDbContext _context
-@inject IJSRuntime JS
 
 <h2>Auswertung – Testmodus (Projekt 1)</h2>
 
@@ -20,12 +22,17 @@ else
 
         <p><strong>Status:</strong> @aktuellesProjekt.Status</p>
 
-        <canvas id="ratingChart" width="400" height="200"></canvas>
-
-        <h4 class="mt-4">Alle Antworten</h4>
-
-        @if (antworten is not null && antworten.Count > 0)
+        @if (antworten.Count > 0)
         {
+            <RadzenChart Style="height:300px; width:600px;">
+                <RadzenColumnSeries Data="@ratingItems"
+                                    CategoryProperty="Category"
+                                    ValueProperty="Value"
+                                    Title="Bewertungen" />
+            </RadzenChart>
+
+            <h4 class="mt-4">Alle Antworten</h4>
+
             <table class="table table-striped">
                 <thead>
                     <tr>
@@ -51,15 +58,27 @@ else
             <p>Keine Antworten vorhanden.</p>
         }
     }
+    else
+    {
+        <p>Projekt nicht gefunden.</p>
+    }
 }
 
 @code {
     private bool isLoading = true;
+
     private Projekt? aktuellesProjekt;
     private List<Antwort> antworten = new();
 
-    // Test: Nur Projekt 1
-    private int selectedProjectId = 1;
+    private int selectedProjectId = 1; // Testprojekt
+
+    private List<RatingItem> ratingItems = new();
+
+    private class RatingItem
+    {
+        public string Category { get; set; } = "";
+        public int Value { get; set; }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -69,40 +88,36 @@ else
 
     private async Task LadeAuswertung()
     {
-        Console.WriteLine("LadeAuswertung gestartet");
+        // Projekt laden
+        aktuellesProjekt = await _context.Projekte
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == selectedProjectId);
 
-        try
+        if (aktuellesProjekt == null)
+            return;
+
+        // Antworten laden
+        antworten = await _context.Antworten
+            .AsNoTracking()
+            .Where(a => a.ProjektId == selectedProjectId)
+            .ToListAsync();
+
+        // Ratings zählen
+        var counts = new int[5];
+        foreach (var a in antworten)
         {
-            Console.WriteLine("Lade Projekt...");
-            aktuellesProjekt = await _context.Projekte
-                .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == selectedProjectId);
-            Console.WriteLine("Projekt geladen");
-
-            Console.WriteLine("Lade Antworten...");
-            antworten = await _context.Antworten
-                .AsNoTracking()
-                .Where(a => a.ProjektId == selectedProjectId)
-                .ToListAsync();
-            Console.WriteLine("Antworten geladen");
-
-            Console.WriteLine("Berechne Counts...");
-            var counts = new int[5];
-            foreach (var a in antworten)
-            {
-                if (a.Rating >= 1 && a.Rating <= 5)
-                    counts[a.Rating - 1]++;
-            }
-            Console.WriteLine("Counts berechnet");
-
-            Console.WriteLine("Rufe JS auf...");
-            await JS.InvokeVoidAsync("renderRatingChart", counts);
-            Console.WriteLine("JS wurde aufgerufen");
+            if (a.Rating >= 1 && a.Rating <= 5)
+                counts[a.Rating - 1]++;
         }
-        catch (Exception ex)
+
+        // Für RadzenChart vorbereiten
+        ratingItems = new()
         {
-            Console.WriteLine("FEHLER in LadeAuswertung:");
-            Console.WriteLine(ex.ToString());
-        }
+            new RatingItem { Category = "1 Stern", Value = counts[0] },
+            new RatingItem { Category = "2 Sterne", Value = counts[1] },
+            new RatingItem { Category = "3 Sterne", Value = counts[2] },
+            new RatingItem { Category = "4 Sterne", Value = counts[3] },
+            new RatingItem { Category = "5 Sterne", Value = counts[4] }
+        };
     }
 }
