@@ -69,7 +69,7 @@ namespace ProActive2508.Service
             return neu;
         }
         public Task<List<Aufgabe>> GetByProjektIdAsync(int projektId)
-    => _db.Aufgaben.Where(a => a.ProjektId == projektId).OrderBy(a => a.Faellig).ToListAsync();
+            => _db.Aufgaben.Where(a => a.ProjektId == projektId).OrderBy(a => a.Faellig).ToListAsync();
 
         public async Task<bool> UpdateAsync(Aufgabe changed, int currentUserId, bool isProjektleiter, CancellationToken ct = default)
         {

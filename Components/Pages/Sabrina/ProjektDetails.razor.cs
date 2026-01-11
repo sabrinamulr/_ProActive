@@ -28,6 +28,10 @@ namespace ProActive2508.Components.Pages.Sabrina
         // neu: aktuelle Benutzer-Id speichern
         private int CurrentUserId;
 
+        // neu: Aufgaben für dieses Projekt
+        protected List<Aufgabe> projektAufgaben = new List<Aufgabe>();
+        protected Dictionary<int, string> aufgabenBenutzerLookup = new();
+
         [Inject] private AppDbContext Db { get; set; } = default!;
         [CascadingParameter] private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
 
@@ -73,6 +77,9 @@ namespace ProActive2508.Components.Pages.Sabrina
                     projectPhases = new List<ProjektPhase>();
                     currentPhase = null;
                     isProjektleiterRole = false;
+
+                    projektAufgaben = new List<Aufgabe>();
+                    aufgabenBenutzerLookup = new Dictionary<int, string>();
                     return;
                 }
 
@@ -130,6 +137,26 @@ namespace ProActive2508.Components.Pages.Sabrina
                 {
                     currentPhase = null;
                 }
+
+                // --- Aufgaben für dieses Projekt laden ---
+                projektAufgaben = await Db.Set<Aufgabe>()
+                    .AsNoTracking()
+                    .Where(a => a.ProjektId.HasValue && a.ProjektId.Value == project.Id)
+                    .OrderBy(a => a.Faellig)
+                    .ToListAsync();
+
+                var benutzerIds = projektAufgaben.Select(a => a.BenutzerId).Where(id => id > 0).Distinct().ToList();
+                if (benutzerIds.Count > 0)
+                {
+                    aufgabenBenutzerLookup = await Db.Benutzer
+                        .AsNoTracking()
+                        .Where(b => benutzerIds.Contains(b.Id))
+                        .ToDictionaryAsync(b => b.Id, b => string.IsNullOrWhiteSpace(b.Email) ? $"User#{b.Id}" : b.Email);
+                }
+                else
+                {
+                    aufgabenBenutzerLookup = new Dictionary<int, string>();
+                }
             }
             catch
             {
@@ -138,6 +165,9 @@ namespace ProActive2508.Components.Pages.Sabrina
                 projectPhases = new List<ProjektPhase>();
                 currentPhase = null;
                 isProjektleiterRole = false;
+
+                projektAufgaben = new List<Aufgabe>();
+                aufgabenBenutzerLookup = new Dictionary<int, string>();
             }
             finally
             {

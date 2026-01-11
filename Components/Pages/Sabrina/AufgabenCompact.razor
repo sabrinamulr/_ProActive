@@ -1,0 +1,173 @@
+@using ProActive2508.Models.Entity.Anja
+@using Microsoft.AspNetCore.Components.Authorization
+@using ProActive2508.Components.Comps.SearchCbx
+@inject AuthenticationStateProvider Auth
+@inject ProActive2508.Data.AppDbContext Db
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="mb-0">Meine Aufgaben</h5>
+    <button class="btn btn-sm btn-primary" @onclick="OpenCreateModal">+</button>
+</div>
+
+@if (isLoading)
+{
+    <p class="mb-0">Lade…</p>
+}
+else
+{
+    var rows = tasks.Take(MaxItems).ToList();
+    if (!rows.Any())
+    {
+        <div class="text-muted">Keine Aufgaben.</div>
+    }
+    else
+    {
+        <ul class="list-group list-group-flush">
+            @foreach (var a in rows)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <div class="me-2">
+                        <div class="fw-bold">#@a.Id</div>
+                        <div class="text-truncate" style="max-width:18rem;">@a.Aufgabenbeschreibung</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="small text-muted">@a.Faellig.ToString("dd.MM.yyyy")</div>
+                        <div class="mt-1">
+                            <button class="btn btn-sm btn-outline-secondary" disabled="@( !CanEdit(a) )" @onclick="(() => OpenEditModal(a.Id))">Bearbeiten</button>
+                        </div>
+                    </div>
+                </li>
+            }
+        </ul>
+
+        @if (tasks.Count > MaxItems)
+        {
+            <div class="mt-2">
+                <a class="btn btn-sm btn-link" href="/aufgabenseite">Mehr anzeigen…</a>
+            </div>
+        }
+    }
+}
+
+@* Modal: gleiche UI wie auf Aufgabenseite (kopiert, damit Verhalten identisch ist) *@
+@if (isModalOpen)
+{
+    <div class="modal-backdrop show"></div>
+
+    <div class="modal show d-block" tabindex="-1" style="--bs-modal-width: 820px;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <div class="modal-header py-2">
+                    <h5 class="modal-title">@modalTitle</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+                </div>
+
+                <EditForm Model="editModel" OnValidSubmit="SaveAsync" FormName="AufgabeCompactForm">
+                    <DataAnnotationsValidator />
+
+                    <div class="modal-body">
+
+                        @if (isProjektleiter)
+                        {
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Projekt</label>
+                                    <SearchCombo TItem="Projekt"
+                                                 Id="ProjekteCbxCompact"
+                                                 Items="projektChoicesForModal"
+                                                 Placeholder="-- Projekt wählen --"
+                                                 LabelSelector="@(p => p.Projektbeschreibung)"
+                                                 Search="@projektSearch"
+                                                 SearchChanged="@(val => projektSearch = val)"
+                                                 OnItemSelected="OnProjektPicked" />
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Bearbeiter</label>
+                                    <SearchCombo TItem="Benutzer"
+                                                 Id="BearbeiterCbxCompact"
+                                                 Items="benutzerChoicesForModal"
+                                                 Placeholder="-- Bearbeiter wählen --"
+                                                 LabelSelector="@(b => b.Id == CurrentUserId
+                                                                                                      ? $"Ich ({(string.IsNullOrWhiteSpace(b.Email) ? "User" : b.Email)})"
+                                                                                                      : $"{(string.IsNullOrWhiteSpace(b.Email) ? "User" : b.Email)} (Id:{b.Id})")"
+                                                 Search="@bearbeiterSearch"
+                                                 SearchChanged="@(val => bearbeiterSearch = val)"
+                                                 OnItemSelected="OnBearbeiterSelected" />
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Projekt</label>
+                                    <SearchCombo TItem="Projekt"
+                                                 Id="ProjekteCbxCompactUser"
+                                                 Items="projektChoicesForModal"
+                                                 Placeholder="-- Projekt wählen --"
+                                                 LabelSelector="@(p => p.Projektbeschreibung)"
+                                                 Search="@projektSearch"
+                                                 SearchChanged="@(val => projektSearch = val)"
+                                                 OnItemSelected="OnProjektPicked" />
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Bearbeiter</label>
+                                    <div class="form-control-plaintext">
+                                        Ich (@(string.IsNullOrWhiteSpace(CurrentUserEmail) ? "User" : CurrentUserEmail))
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info mt-2 mb-0">
+                                Nur <strong>Projektleiter</strong> dürfen Aufgaben an andere zuweisen.
+                            </div>
+                        }
+
+                        <div class="mt-3">
+                            <label class="form-label mb-1">Aufgabenbeschreibung</label>
+                            <InputTextArea class="form-control"
+                                           @bind-Value="editModel.Aufgabenbeschreibung"
+                                           rows="3"
+                                           placeholder="Was ist zu tun?" />
+                        </div>
+
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1">Fällig am</label>
+                                <InputDate class="form-control" @bind-Value="editModel.Faellig" />
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label mb-1">Phase</label>
+                                <InputSelect class="form-select" @bind-Value="editModel.Phase">
+                                    <option value="0">0 – Offen</option>
+                                    <option value="1">1 – In Bearbeitung</option>
+                                    <option value="2">2 – Review</option>
+                                    <option value="3">3 – Sonstiges</option>
+                                </InputSelect>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label mb-1">Status</label>
+                                <div class="form-control-plaintext">
+                                    <span class="badge @GetStatusClass(editModel.Erledigt)">@editModel.Erledigt</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseModal">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary">Speichern</button>
+                    </div>
+
+                </EditForm>
+
+            </div>
+        </div>
+    </div>
+}

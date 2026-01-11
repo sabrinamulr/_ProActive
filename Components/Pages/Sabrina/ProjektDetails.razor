@@ -91,6 +91,34 @@ else
         }
     </div>
 
+    @* --- Neue Sektion: Aufgaben für dieses Projekt --- *@
+    <div class="mt-4">
+        <h5>Aufgaben</h5>
+        @if (projektAufgaben == null || !projektAufgaben.Any())
+        {
+            <div class="text-muted">Keine Aufgaben zum Projekt.</div>
+        }
+        else
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var a in projektAufgaben)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div class="me-2">
+                            <div class="fw-bold">#@a.Id</div>
+                            <div class="text-truncate" style="max-width:18rem;">@a.Aufgabenbeschreibung</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="small text-muted">@a.Faellig.ToString("dd.MM.yyyy")</div>
+                            <div class="small">Phase: @a.Phase</div>
+                            <div class="mt-1 small">@(aufgabenBenutzerLookup.TryGetValue(a.BenutzerId, out var u) ? u : $"Id:{a.BenutzerId}")</div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+
     @if (CanEdit(project))
     {
         <button class="btn btn-outline-secondary" @onclick="() => editingProjectId = project?.Id ?? 0">Bearbeiten</button>
