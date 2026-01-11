@@ -3,12 +3,12 @@
 @using ProActive2508.Data
 @using ProActive2508.Models.Entity.Anja
 @using Microsoft.EntityFrameworkCore
-@using Radzen
 @using Radzen.Blazor
 
 @inject AppDbContext _context
+@rendermode InteractiveServer
 
-<h2>Auswertung – Testmodus (Projekt 1)</h2>
+<h2>Auswertung</h2>
 
 @if (isLoading)
 {
@@ -16,22 +16,96 @@
 }
 else
 {
-    @if (aktuellesProjekt != null)
-    {
-        <h3>@aktuellesProjekt.Projektbeschreibung</h3>
+    <!-- ⭐ PROJEKT-AUSWAHL FÜR DETAIL-EINBLICKE -->
+    <label><strong>Projekt auswählen (Detailansicht):</strong></label>
+    <select class="form-select"
+            style="width:300px;"
+            @onchange="OnProjectChanged">
+        <option value="">-- Bitte wählen --</option>
+        @foreach (var p in projektListe)
+        {
+            <option value="@p.Id">@p.Projektbeschreibung</option>
+        }
+    </select>
 
+    <!-- ⭐ GLOBALER PROJEKTVERGLEICH (IMMER SICHTBAR) -->
+    <h3 class="mt-4">Projektvergleich – Durchschnitt pro Projekt (alle Projekte)</h3>
+
+    @if (projektDurchschnitte.Count == 0)
+    {
+        <p>Keine Antworten für die Projekte vorhanden.</p>
+    }
+    else
+    {
+        <RadzenChart Style="height:300px; width:600px;" >
+            <RadzenAreaSeries Data="@projektDurchschnitte"
+                              CategoryProperty="ProjektName"
+                              ValueProperty="Durchschnitt"
+                              Title="Durchschnittsbewertung" />
+        </RadzenChart>
+        <h5>Debug: ProjektDurchschnitte</h5>
+        <table class="table table-sm table-bordered" style="max-width:500px;">
+            <thead>
+                <tr>
+                    <th>ProjektId</th>
+                    <th>ProjektName</th>
+                    <th>Durchschnitt</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in projektDurchschnitte)
+                {
+                    <tr>
+                        <td>@p.ProjektId</td>
+                        <td>@p.ProjektName</td>
+                        <td>@p.Durchschnitt</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+    }
+
+    <!-- ⭐ DETAILANSICHT NUR WENN PROJEKT GEWÄHLT -->
+    @if (selectedProjectId != null && aktuellesProjekt != null)
+    {
+        <h3 class="mt-4">Detailauswertung – @aktuellesProjekt.Projektbeschreibung</h3>
         <p><strong>Status:</strong> @aktuellesProjekt.Status</p>
 
-        @if (antworten.Count > 0)
+        @if (antwortenProjekt.Count > 0)
         {
+            <!-- ⭐ STERNVERTEILUNG FÜR DAS GEWÄHLTE PROJEKT -->
+            <h4 class="mt-3">Sternverteilung (Projekt)</h4>
             <RadzenChart Style="height:300px; width:600px;">
-                <RadzenColumnSeries Data="@ratingItems"
+                <RadzenColumnSeries Data="@ratingItemsProjekt"
                                     CategoryProperty="Category"
                                     ValueProperty="Value"
                                     Title="Bewertungen" />
             </RadzenChart>
 
-            <h4 class="mt-4">Alle Antworten</h4>
+            <!-- ⭐ KATEGORIE-AUSWERTUNG FÜR DAS GEWÄHLTE PROJEKT -->
+            <h4 class="mt-4">Durchschnitt pro Kategorie (Projekt)</h4>
+
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Kategorie</th>
+                        <th>Durchschnitt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var k in kategorieAuswertungenProjekt)
+                    {
+                        <tr>
+                            <td>@k.KategorieName</td>
+                            <td>@k.Durchschnitt.ToString("0.0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <!-- ⭐ ALLE ANTWORTEN FÜR DAS GEWÄHLTE PROJEKT -->
+            <h4 class="mt-4">Alle Antworten (Projekt)</h4>
 
             <table class="table table-striped">
                 <thead>
@@ -42,7 +116,7 @@ else
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var a in antworten)
+                    @foreach (var a in antwortenProjekt)
                     {
                         <tr>
                             <td>@a.FrageId</td>
@@ -55,63 +129,138 @@ else
         }
         else
         {
-            <p>Keine Antworten vorhanden.</p>
+            <p>Keine Antworten für dieses Projekt vorhanden.</p>
         }
     }
     else
     {
-        <p>Projekt nicht gefunden.</p>
+        <p class="mt-3">Bitte ein Projekt auswählen, um Details zu sehen.</p>
     }
 }
 
 @code {
     private bool isLoading = true;
 
+    // Globale Daten (alle Antworten)
+    private List<Antwort> alleAntworten = new();
+    private List<Projekt> projektListe = new();
+
+    // Globale Auswertungen
+    private List<ProjektDurchschnitt> projektDurchschnitte = new();
+
+    // Auswahl für Detail
+    private int? selectedProjectId = null;
     private Projekt? aktuellesProjekt;
-    private List<Antwort> antworten = new();
+    private List<Antwort> antwortenProjekt = new();
 
-    private int selectedProjectId = 1; // Testprojekt
+    // Sternverteilung pro Projekt
+    private List<RatingItem> ratingItemsProjekt = new();
 
-    private List<RatingItem> ratingItems = new();
+    // Kategorien pro Projekt
+    private List<KategorieAuswertung> kategorieAuswertungenProjekt = new();
 
+    // Hilfsklassen
     private class RatingItem
     {
         public string Category { get; set; } = "";
         public int Value { get; set; }
     }
 
+    public class KategorieAuswertung
+    {
+        public string KategorieName { get; set; } = "";
+        public double Durchschnitt { get; set; }
+    }
+
+    public class ProjektDurchschnitt
+    {
+        public int ProjektId { get; set; }
+        public string ProjektName { get; set; } = "";
+        public double Durchschnitt { get; set; }
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        await LadeAuswertung();
+        isLoading = true;
+
+        // Alle Projekte
+        projektListe = await _context.Projekte
+            .AsNoTracking()
+            .OrderBy(p => p.Id)
+            .ToListAsync();
+
+        // Alle Antworten inkl. Projekt / Frage / Kategorie
+        alleAntworten = await _context.Antworten
+            .Include(a => a.Projekt)
+            .Include(a => a.Frage)
+                .ThenInclude(f => f.Kategorie)
+            .AsNoTracking()
+            .ToListAsync();
+
+        BerechneProjektDurchschnitte();
+
         isLoading = false;
     }
 
-    private async Task LadeAuswertung()
+    private void BerechneProjektDurchschnitte()
     {
-        // Projekt laden
+        projektDurchschnitte = alleAntworten
+            .Where(a => a.Projekt != null)
+            .GroupBy(a => a.ProjektId)
+            .Select(g => new ProjektDurchschnitt
+            {
+                ProjektId = g.Key,
+                ProjektName = g.First().Projekt!.Projektbeschreibung,
+                Durchschnitt = g.Average(a => a.Rating)
+            })
+            .OrderBy(p => p.ProjektId)
+            .ToList();
+    }
+
+    private async Task OnProjectChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int id))
+            selectedProjectId = id;
+        else
+            selectedProjectId = null;
+
+        await LadeProjektDetails();
+    }
+
+    private async Task LadeProjektDetails()
+    {
+        if (selectedProjectId == null)
+        {
+            aktuellesProjekt = null;
+            antwortenProjekt.Clear();
+            ratingItemsProjekt.Clear();
+            kategorieAuswertungenProjekt.Clear();
+            return;
+        }
+
         aktuellesProjekt = await _context.Projekte
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == selectedProjectId);
+            .FirstOrDefaultAsync(p => p.Id == selectedProjectId.Value);
 
-        if (aktuellesProjekt == null)
-            return;
+        antwortenProjekt = alleAntworten
+            .Where(a => a.ProjektId == selectedProjectId.Value)
+            .ToList();
 
-        // Antworten laden
-        antworten = await _context.Antworten
-            .AsNoTracking()
-            .Where(a => a.ProjektId == selectedProjectId)
-            .ToListAsync();
+        BerechneSternverteilungProjekt();
+        BerechneKategorieAuswertungProjekt();
+    }
 
-        // Ratings zählen
+    private void BerechneSternverteilungProjekt()
+    {
         var counts = new int[5];
-        foreach (var a in antworten)
+
+        foreach (var a in antwortenProjekt)
         {
             if (a.Rating >= 1 && a.Rating <= 5)
                 counts[a.Rating - 1]++;
         }
 
-        // Für RadzenChart vorbereiten
-        ratingItems = new()
+        ratingItemsProjekt = new()
         {
             new RatingItem { Category = "1 Stern", Value = counts[0] },
             new RatingItem { Category = "2 Sterne", Value = counts[1] },
@@ -119,5 +268,18 @@ else
             new RatingItem { Category = "4 Sterne", Value = counts[3] },
             new RatingItem { Category = "5 Sterne", Value = counts[4] }
         };
+    }
+
+    private void BerechneKategorieAuswertungProjekt()
+    {
+        kategorieAuswertungenProjekt = antwortenProjekt
+            .GroupBy(a => a.Frage.KategorieId)
+            .Select(g => new KategorieAuswertung
+            {
+                KategorieName = g.First().Frage.Kategorie.Name,
+                Durchschnitt = g.Average(a => a.Rating)
+            })
+            .OrderBy(k => k.KategorieName)
+            .ToList();
     }
 }

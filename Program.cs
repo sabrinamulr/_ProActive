@@ -1,6 +1,7 @@
 ﻿using Blazorise;
 using Blazorise.Bootstrap5;
 using Blazorise.Icons.FontAwesome;
+using DocumentFormat.OpenXml.InkML;
 using Microsoft.AspNetCore.Antiforgery;                              // IAntiforgery
 using Microsoft.AspNetCore.Authentication;                           // SignInAsync/SignOutAsync
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -284,6 +285,47 @@ using (var scope = app.Services.CreateScope())
         db.UmfrageKategorien.AddRange(kategorien);
         await db.SaveChangesAsync();
     }
+    var antworten = new List<Antwort>();
+
+    // Projekt 2 – positive
+    for (int frageId = 1; frageId <= 20; frageId++)
+    {
+        antworten.Add(new Antwort
+        {
+            ProjektId = 2,
+            FrageId = frageId,
+            Rating = Random.Shared.Next(4, 6), // 4–5
+            Datum = DateTime.Now.AddDays(-30)
+        });
+    }
+
+    // Projekt 3 – gemischt
+    for (int frageId = 1; frageId <= 20; frageId++)
+    {
+        antworten.Add(new Antwort
+        {
+            ProjektId = 3,
+            FrageId = frageId,
+            Rating = Random.Shared.Next(2, 5), // 2–4
+            Datum = DateTime.Now.AddDays(-20)
+        });
+    }
+
+    // Projekt 4 – kritisch
+    for (int frageId = 1; frageId <= 20; frageId++)
+    {
+        antworten.Add(new Antwort
+        {
+            ProjektId = 4,
+            FrageId = frageId,
+            Rating = Random.Shared.Next(1, 4), // 1–3
+            Datum = DateTime.Now.AddDays(-10)
+        });
+    }
+
+    // In Datenbank einfügen
+    db.Antworten.AddRange(antworten);
+    db.SaveChanges();
 
     //    // ---------- Allergene ----------
     if (!await db.Allergene.AnyAsync())
