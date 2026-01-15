@@ -8,135 +8,172 @@
 @inject AppDbContext _context
 @rendermode InteractiveServer
 
-<h2>Auswertung</h2>
 
-@if (isLoading)
-{
-    <p>Lade Daten…</p>
-}
-else
-{
-    <!-- ⭐ PROJEKT-AUSWAHL FÜR DETAIL-EINBLICKE -->
-    <label><strong>Projekt auswählen (Detailansicht):</strong></label>
-    <select class="form-select"
-            style="width:300px;"
-            @onchange="OnProjectChanged">
-        <option value="">-- Bitte wählen --</option>
-        @foreach (var p in projektListe)
-        {
-            <option value="@p.Id">@p.Projektbeschreibung</option>
-        }
-    </select>
+<div class="container mt-4">
 
-    <!-- ⭐ GLOBALER PROJEKTVERGLEICH (IMMER SICHTBAR) -->
-    <h3 class="mt-4">Projektvergleich – Durchschnitt pro Projekt (alle Projekte)</h3>
+    <h2 class="mb-4">Auswertung</h2>
 
-    @if (projektDurchschnitte.Count == 0)
+    @if (isLoading)
     {
-        <p>Keine Antworten für die Projekte vorhanden.</p>
+        <div class="alert alert-info">Lade Daten…</div>
     }
     else
     {
-        <RadzenChart Style="height:300px; width:600px;" >
-            <RadzenAreaSeries Data="@projektDurchschnitte"
-                              CategoryProperty="ProjektName"
-                              ValueProperty="Durchschnitt"
-                              Title="Durchschnittsbewertung" />
-        </RadzenChart>
-        <h5>Debug: ProjektDurchschnitte</h5>
-        <table class="table table-sm table-bordered" style="max-width:500px;">
-            <thead>
-                <tr>
-                    <th>ProjektId</th>
-                    <th>ProjektName</th>
-                    <th>Durchschnitt</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var p in projektDurchschnitte)
+        
+
+        <!-- ⭐ GLOBALER PROJEKTVERGLEICH -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Projektvergleich – Durchschnitt pro Projekt (alle Projekte)</strong>
+            </div>
+
+            <div class="card-body">
+                @if (projektDurchschnitte.Count == 0)
                 {
-                    <tr>
-                        <td>@p.ProjektId</td>
-                        <td>@p.ProjektName</td>
-                        <td>@p.Durchschnitt</td>
-                    </tr>
+                    <p>Keine Antworten für die Projekte vorhanden.</p>
                 }
-            </tbody>
-        </table>
+                else
+                {
+                    <RadzenChart Style="height:300px; width:100%;">
+<RadzenAreaSeries Data="@projektDurchschnitte"
+                  CategoryProperty="ProjektName"
+                  ValueProperty="Durchschnitt"
+                  Title="Durchschnittsbewertung">
+    <TooltipTemplate Context="p">
+        <div style="padding:4px; background:#74181E; color:white; border-radius:4px;">
+            <strong>@p.ProjektName</strong><br />
+            Durchschnitt: @p.Durchschnitt.ToString("0.00")
+        </div>
+    </TooltipTemplate>
+</RadzenAreaSeries>                    
+</RadzenChart>
 
-    }
+                    <!-- Debug optional -->
+                    <h5 class="mt-4">Debug: ProjektDurchschnitte</h5>
+                    <table class="table table-sm table-bordered" style="max-width:500px;">
+                        <thead>
+                            <tr>
+                                <th>ProjektId</th>
+                                <th>ProjektName</th>
+                                <th>Durchschnitt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in projektDurchschnitte)
+                            {
+                                <tr>
+                                    <td>@p.ProjektId</td>
+                                    <td>@p.ProjektName</td>
+                                    <td>@p.Durchschnitt</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
 
-    <!-- ⭐ DETAILANSICHT NUR WENN PROJEKT GEWÄHLT -->
-    @if (selectedProjectId != null && aktuellesProjekt != null)
-    {
-        <h3 class="mt-4">Detailauswertung – @aktuellesProjekt.Projektbeschreibung</h3>
-        <p><strong>Status:</strong> @aktuellesProjekt.Status</p>
-
-        @if (antwortenProjekt.Count > 0)
+        <!-- ⭐ DETAILANSICHT -->
+        @if (selectedProjectId != null && aktuellesProjekt != null)
         {
-            <!-- ⭐ STERNVERTEILUNG FÜR DAS GEWÄHLTE PROJEKT -->
-            <h4 class="mt-3">Sternverteilung (Projekt)</h4>
-            <RadzenChart Style="height:300px; width:600px;">
-                <RadzenColumnSeries Data="@ratingItemsProjekt"
-                                    CategoryProperty="Category"
-                                    ValueProperty="Value"
-                                    Title="Bewertungen" />
-            </RadzenChart>
+            <div class="card mb-4">
+                <div class="card-header">
+                    <strong>Detailauswertung – @aktuellesProjekt.Projektbeschreibung</strong>
+                </div>
 
-            <!-- ⭐ KATEGORIE-AUSWERTUNG FÜR DAS GEWÄHLTE PROJEKT -->
-            <h4 class="mt-4">Durchschnitt pro Kategorie (Projekt)</h4>
+                <div class="card-body">
 
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Kategorie</th>
-                        <th>Durchschnitt</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var k in kategorieAuswertungenProjekt)
+                    <p><strong>Status:</strong> @aktuellesProjekt.Status</p>
+
+                    @if (antwortenProjekt.Count > 0)
                     {
-                        <tr>
-                            <td>@k.KategorieName</td>
-                            <td>@k.Durchschnitt.ToString("0.0")</td>
-                        </tr>
+                        <!-- ⭐ STERNVERTEILUNG -->
+                        <h4 class="mt-4">Sternverteilung (Projekt)</h4>
+                        <RadzenChart Style="height:300px; width:100%;">
+<RadzenColumnSeries Data="@ratingItemsProjekt"
+                    CategoryProperty="Category"
+                    ValueProperty="Value"
+                    Title="Bewertungen">
+    <TooltipTemplate Context="item">
+        <div style="padding:4px; background:#74181E; color:white; border-radius:4px;">
+            @item.Category<br />
+            @item.Value Antworten
+        </div>
+    </TooltipTemplate>
+</RadzenColumnSeries>
+                        </RadzenChart>
+
+                        <!-- ⭐ KATEGORIE-AUSWERTUNG -->
+                        <h4 class="mt-4">Durchschnitt pro Kategorie</h4>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Kategorie</th>
+                                    <th>Durchschnitt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var k in kategorieAuswertungenProjekt)
+                                {
+                                    <tr>
+                                        <td>@k.KategorieName</td>
+                                        <td>@k.Durchschnitt.ToString("0.0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+
+                        <!-- ⭐ ALLE ANTWORTEN -->
+                        <h4 class="mt-4">Alle Antworten</h4>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Frage</th>
+                                    <th>Sterne</th>
+                                    <th>Datum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var a in antwortenProjekt)
+                                {
+                                    <tr>
+                                        <td>@a.FrageId</td>
+                                        <td>@a.Rating</td>
+                                        <td>@(a.Datum == default ? "-" : a.Datum.ToString("dd.MM.yyyy HH:mm"))</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
                     }
-                </tbody>
-            </table>
-
-            <!-- ⭐ ALLE ANTWORTEN FÜR DAS GEWÄHLTE PROJEKT -->
-            <h4 class="mt-4">Alle Antworten (Projekt)</h4>
-
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Frage</th>
-                        <th>Sterne</th>
-                        <th>Datum</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var a in antwortenProjekt)
+                    else
                     {
-                        <tr>
-                            <td>@a.FrageId</td>
-                            <td>@a.Rating</td>
-                            <td>@(a.Datum == default ? "-" : a.Datum.ToString("dd.MM.yyyy HH:mm"))</td>
-                        </tr>
+                        <p>Keine Antworten für dieses Projekt vorhanden.</p>
                     }
-                </tbody>
-            </table>
+                </div>
+            </div>
         }
         else
         {
-            <p>Keine Antworten für dieses Projekt vorhanden.</p>
+            <p class="mt-3">Bitte ein Projekt auswählen, um Details zu sehen.</p>
         }
+        <!-- ⭐ PROJEKT-AUSWAHL -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Projekt auswählen (Detailansicht)</strong>
+            </div>
+            <div class="card-body">
+                <select class="form-select w-auto"
+                        @onchange="OnProjectChanged">
+                    <option value="">-- Bitte wählen --</option>
+                    @foreach (var p in projektListe)
+                    {
+                        <option value="@p.Id">@p.Projektbeschreibung</option>
+                    }
+                </select>
+            </div>
+        </div>
     }
-    else
-    {
-        <p class="mt-3">Bitte ein Projekt auswählen, um Details zu sehen.</p>
-    }
-}
+</div>
 
 @code {
     private bool isLoading = true;

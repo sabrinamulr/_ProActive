@@ -8,8 +8,8 @@ a, .btn-link {
 
 .btn-primary {
     color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    background-color: #74181E;
+    border-color: #000000;
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
@@ -57,4 +57,30 @@ h1:focus {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
+}
+/* Einheitliche Button-Farbe für ALLE Buttons */
+.btn,
+.btn:hover,
+.btn:focus,
+.btn:active {
+    background-color: #74181E !important;
+    border-color: #74181E !important;
+    color: white !important;
+}
+
+/* Link-Buttons */
+.btn-link,
+.btn-link:hover,
+.btn-link:focus {
+    color: white !important;
+    text-decoration: none;
+}
+
+/* Outline-Buttons */
+.btn-outline-primary,
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+    color: white !important;
+    background-color: #74181E !important;
+    border-color: #74181E !important;
 }
