@@ -185,6 +185,7 @@ using (var scope = app.Services.CreateScope())
                     new() { BenutzerId = benutzer[2].Id, ProjektleiterId = benutzer[3].Id, AuftraggeberId = benutzer[4].Id, Status = Projektstatus.Abgeschlossen, Phase = phaseP7Id ?? 0, Projektbeschreibung="Audi"  },
                     new() { BenutzerId = benutzer[3].Id, ProjektleiterId = benutzer[4].Id, AuftraggeberId = benutzer[0].Id, Status = Projektstatus.Aktiv,         Phase = phaseP0Id ?? 0, Projektbeschreibung = "Mercedes"},
                     new() { BenutzerId = benutzer[4].Id, ProjektleiterId = benutzer[0].Id, AuftraggeberId = benutzer[1].Id, Status = Projektstatus.Pausiert,      Phase = phaseP8Id ?? 0, Projektbeschreibung = "Seat"},
+
                 };
         db.Projekte.AddRange(proj);
         await db.SaveChangesAsync();
