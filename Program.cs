@@ -300,16 +300,16 @@ using (var scope = app.Services.CreateScope())
     }
 
     // Projekt 3 – gemischt
-    for (int frageId = 1; frageId <= 20; frageId++)
-    {
-        antworten.Add(new Antwort
-        {
-            ProjektId = 3,
-            FrageId = frageId,
-            Rating = Random.Shared.Next(2, 5), // 2–4
-            Datum = DateTime.Now.AddDays(-20)
-        });
-    }
+    //for (int frageId = 1; frageId <= 20; frageId++)
+    //{
+    //    antworten.Add(new Antwort
+    //    {
+    //        ProjektId = 3,
+    //        FrageId = frageId,
+    //        Rating = Random.Shared.Next(2, 5), // 2–4
+    //        Datum = DateTime.Now.AddDays(-20)
+    //    });
+    //}
 
     // Projekt 4 – kritisch
     for (int frageId = 1; frageId <= 20; frageId++)

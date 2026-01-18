@@ -1,5 +1,6 @@
 ﻿@* File: Components/Layout/MainLayout.razor *@
 @inherits LayoutComponentBase
+@inject NavigationManager Nav
 @using ProActive2508.Components
 @using Radzen
 @using Radzen.Blazor
@@ -14,9 +15,12 @@
 </HeadContent>
 
 <div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+    @if (!Nav.Uri.Contains("/auth/login") && !Nav.Uri.Contains("/login"))
+    {
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+    }
 
     <main>
         <div class="top-row px-4">

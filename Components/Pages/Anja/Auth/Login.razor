@@ -1,10 +1,12 @@
 ﻿@* Datei: Components/Pages/Anja/Auth/Login.razor *@
 @* Seite: Login *@
 
+
 @page "/auth/login"
 @using ProActive2508.Models.Anja
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
+
 
 @if (!string.IsNullOrEmpty(LogoutInfo))
 {
