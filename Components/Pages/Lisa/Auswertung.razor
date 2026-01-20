@@ -3,11 +3,10 @@
 @using ProActive2508.Data
 @using ProActive2508.Models.Entity.Anja
 @using Microsoft.EntityFrameworkCore
-@using Radzen.Blazor
 
 @inject AppDbContext _context
+@inject IJSRuntime JS
 @rendermode InteractiveServer
-
 
 <div class="container mt-4">
 
@@ -19,13 +18,13 @@
     }
     else
     {
-        
-
         <!-- ⭐ GLOBALER PROJEKTVERGLEICH -->
-        <div class="card mb-4">
-            <div class="card-header">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-light">
                 <strong>Projektvergleich – Durchschnitt pro Projekt (alle Projekte)</strong>
+                
             </div>
+            
 
             <div class="card-body">
                 @if (projektDurchschnitte.Count == 0)
@@ -34,20 +33,8 @@
                 }
                 else
                 {
-                    <RadzenChart Style="height:300px; width:100%;">
-<RadzenAreaSeries Data="@projektDurchschnitte"
-                  CategoryProperty="ProjektName"
-                  ValueProperty="Durchschnitt"
-                  Title="Durchschnittsbewertung">
-    <TooltipTemplate Context="p">
-        <div style="padding:4px; background:#74181E; color:white; border-radius:4px;">
-            <strong>@p.ProjektName</strong><br />
-            Durchschnitt: @p.Durchschnitt.ToString("0.00")
-        </div>
-    </TooltipTemplate>
-</RadzenAreaSeries>                    
-</RadzenChart>
-
+                    <canvas id="projektVergleichChart" style="height:100px !important;"></canvas>
+                    <p font-size="20"><strong>Antworten Anzahl (aller Projekte):</strong> @alleAntworten.Count</p>
                     <!-- Debug optional -->
                     <h5 class="mt-4">Debug: ProjektDurchschnitte</h5>
                     <table class="table table-sm table-bordered" style="max-width:500px;">
@@ -87,63 +74,59 @@
 
                     @if (antwortenProjekt.Count > 0)
                     {
-                        <!-- ⭐ STERNVERTEILUNG -->
-                        <h4 class="mt-4">Sternverteilung (Projekt)</h4>
-                        <RadzenChart Style="height:300px; width:100%;">
-<RadzenColumnSeries Data="@ratingItemsProjekt"
-                    CategoryProperty="Category"
-                    ValueProperty="Value"
-                    Title="Bewertungen">
-    <TooltipTemplate Context="item">
-        <div style="padding:4px; background:#74181E; color:white; border-radius:4px;">
-            @item.Category<br />
-            @item.Value Antworten
-        </div>
-    </TooltipTemplate>
-</RadzenColumnSeries>
-                        </RadzenChart>
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <!-- ⭐ STERNVERTEILUNG -->
+                                <h4 class="mt-4">Sternverteilung (Projekt)</h4>
+                                <canvas id="sternChart" height="200"></canvas>
 
-                        <!-- ⭐ KATEGORIE-AUSWERTUNG -->
-                        <h4 class="mt-4">Durchschnitt pro Kategorie</h4>
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Kategorie</th>
-                                    <th>Durchschnitt</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var k in kategorieAuswertungenProjekt)
-                                {
-                                    <tr>
-                                        <td>@k.KategorieName</td>
-                                        <td>@k.Durchschnitt.ToString("0.0")</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
+                                <!-- ⭐ KATEGORIE-AUSWERTUNG -->
+                                <h4 class="mt-4">Durchschnitt pro Kategorie</h4>
+                                <canvas id="kategorieChart" height="200"></canvas>
+                            </div>
 
-                        <!-- ⭐ ALLE ANTWORTEN -->
-                        <h4 class="mt-4">Alle Antworten</h4>
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Frage</th>
-                                    <th>Sterne</th>
-                                    <th>Datum</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var a in antwortenProjekt)
-                                {
-                                    <tr>
-                                        <td>@a.FrageId</td>
-                                        <td>@a.Rating</td>
-                                        <td>@(a.Datum == default ? "-" : a.Datum.ToString("dd.MM.yyyy HH:mm"))</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
+                            <div class="col-lg-6">
+                                <!-- Tabelle Kategorien -->
+                                <h4 class="mt-4">Kategorien (Tabelle)</h4>
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Kategorie</th>
+                                            <th>Durchschnitt</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var k in kategorieAuswertungenProjekt)
+                                        {
+                                            <tr>
+                                                <td>@k.KategorieName</td>
+                                                <td>@k.Durchschnitt.ToString("0.0")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+
+                                <!-- ⭐ ALLE ANTWORTEN -->
+                                <h4 class="mt-4">Anzahl der Antworten per Kategorie</h4>
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Kategorie</th>
+                                            <th>Anzahl der Antworten</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var k in kategorieAuswertungenProjekt)
+                                        {
+                                            <tr>
+                                                <td>@k.KategorieName</td>
+                                                <td>@k.Anzahl</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     }
                     else
                     {
@@ -156,6 +139,7 @@
         {
             <p class="mt-3">Bitte ein Projekt auswählen, um Details zu sehen.</p>
         }
+
         <!-- ⭐ PROJEKT-AUSWAHL -->
         <div class="card mb-4">
             <div class="card-header">
@@ -176,6 +160,8 @@
 </div>
 
 @code {
+    // 🔹 ALLE DEINE ALTEN FELDER UND KLASSEN
+
     private bool isLoading = true;
 
     // Globale Daten (alle Antworten)
@@ -207,6 +193,8 @@
     {
         public string KategorieName { get; set; } = "";
         public double Durchschnitt { get; set; }
+        public int Anzahl { get; set; }
+
     }
 
     public class ProjektDurchschnitt
@@ -314,9 +302,107 @@
             .Select(g => new KategorieAuswertung
             {
                 KategorieName = g.First().Frage.Kategorie.Name,
-                Durchschnitt = g.Average(a => a.Rating)
+                Durchschnitt = g.Average(a => a.Rating),
+                Anzahl = g.Count()
             })
             .OrderBy(k => k.KategorieName)
             .ToList();
+    }
+
+    // 🔹 NEU: Chart.js Rendering
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (projektDurchschnitte.Any())
+        {
+            await RenderProjektVergleichChart();
+        }
+
+        if (selectedProjectId != null && antwortenProjekt.Any())
+        {
+            await RenderSternChart();
+            await RenderKategorieChart();
+        }
+    }
+
+    private async Task RenderProjektVergleichChart()
+    {
+        await JS.InvokeVoidAsync("chartFunctions.createChart",
+            "projektVergleichChart",
+            "line",
+            new
+            {
+                labels = projektDurchschnitte.Select(p => p.ProjektName),
+                datasets = new[]
+                {
+                    new {
+                        label = "Durchschnitt",
+                        data = projektDurchschnitte.Select(p => p.Durchschnitt),                   
+                        borderColor = "#74181E",
+                        backgroundColor = "rgba(116,24,30,0.25)",
+                        borderWidth = 2,
+                        tension = 0.3,
+                    }
+                }
+            },
+            new
+            {
+                responsive = true,
+
+            }
+        );
+    }
+
+    private async Task RenderSternChart()
+    {
+        await JS.InvokeVoidAsync("chartFunctions.createChart",
+            "sternChart",
+            "bar",
+            new
+            {
+                labels = ratingItemsProjekt.Select(r => r.Category),
+                datasets = new[]
+                {
+                    new {
+                        label = "Bewertungen",
+                        data = ratingItemsProjekt.Select(r => r.Value),
+                        backgroundColor = "#74181E88",
+                        borderColor = "#74181E",
+                        borderWidth = 2
+                    }
+                }
+            },
+            new
+            {
+                responsive = true
+            }
+        );
+    }
+
+    private async Task RenderKategorieChart()
+    {
+        await JS.InvokeVoidAsync("chartFunctions.createChart",
+            "kategorieChart",
+            "bar",
+            new
+            {
+                labels = kategorieAuswertungenProjekt.Select(k => k.KategorieName),
+                datasets = new[]
+                {
+                    new {
+                        label = "Durchschnitt",
+                        data = kategorieAuswertungenProjekt.Select(k => k.Durchschnitt),
+                        backgroundColor = "#74181E88",
+                        borderColor = "#74181E",
+                        borderWidth = 2
+                    }
+                }
+            },
+            new
+            {
+                indexAxis = "y",
+                responsive = true
+            }
+        );
     }
 }
