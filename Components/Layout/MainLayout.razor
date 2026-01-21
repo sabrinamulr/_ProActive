@@ -31,18 +31,6 @@
                     <Authorized Context="ctx">
                         <span class="me-2">Hello, @ctx.User?.Identity?.Name!</span>
 
-                        @* Weis noch nicht ob so schlauer 
-                            @* Schnellzugriff: Projekte (sichtbar für angemeldete Nutzer) 
-                        <a class="btn btn-link me-2 p-0 align-baseline" href="/meine-projekte">
-                            @if (ctx.User.IsInRole("Projektleiter"))
-                            {
-                                <span>Projekte verwalten</span>
-                            }
-                            else
-                            {
-                                <span>Projekte</span>
-                            }
-                        </a> *@
 
                         @* Logout per klassischem POST auf /auth/logout (setzt Cookie serverseitig) *@
                         <form method="post"
@@ -62,7 +50,6 @@
                 </AuthorizeView>
             </CascadingAuthenticationState>
 
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
         </div>
 
         <article class="content px-4">
