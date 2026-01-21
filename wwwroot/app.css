@@ -8,7 +8,7 @@ a, .btn-link {
 
 .btn-primary {
     color: #fff;
-    background-color: #74181E;
+    background-color: #000000;
     border-color: #000000;
 }
 
@@ -84,3 +84,52 @@ h1:focus {
     background-color: #74181E !important;
     border-color: #74181E !important;
 }
+/* Zentriert alles vertikal & horizontal */
+.login-wrapper {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+/* Logo */
+.login-logo {
+    width: 150px;
+    margin-bottom: 0.5rem;
+}
+
+/* Form soll nicht auseinanderfallen */
+.login-form {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Card */
+.login-card {
+    width: 100%;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #74181E 0%, #2b0d0f 100%);
+    color: white;
+}
+
+/* Button */
+.login-button {
+    width: 100%;
+    background: black;
+    color: white;
+    padding: 0.75rem;
+    border-radius: 12px;
+    border: none;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+    .login-button:hover {
+        background: #222;
+    }

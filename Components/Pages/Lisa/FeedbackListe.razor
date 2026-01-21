@@ -38,6 +38,10 @@ else
                         @if (p.Antworten.Any())
                         {
                             <span class="text-success fw-bold">Feedback abgegeben</span>
+                            <button class="btn btn-primary"
+                                    @onclick="@(() => StartFeedback(p.Id))">
+                                Feedback ansehen
+                            </button>
                         }
                         else
                         {

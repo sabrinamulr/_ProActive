@@ -33,10 +33,10 @@
                 }
                 else
                 {
-                    <canvas id="projektVergleichChart" style="height:100px !important;"></canvas>
+                    <canvas id="projektVergleichChart" style="height:50px width=50px !important;"></canvas>
                     <p font-size="20"><strong>Antworten Anzahl (aller Projekte):</strong> @alleAntworten.Count</p>
                     <!-- Debug optional -->
-                    <h5 class="mt-4">Debug: ProjektDurchschnitte</h5>
+                    <h5 class="mt-4"> Durchschnitte der Projekte</h5>
                     <table class="table table-sm table-bordered" style="max-width:500px;">
                         <thead>
                             <tr>
@@ -86,27 +86,7 @@
                             </div>
 
                             <div class="col-lg-6">
-                                <!-- Tabelle Kategorien -->
-                                <h4 class="mt-4">Kategorien (Tabelle)</h4>
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Kategorie</th>
-                                            <th>Durchschnitt</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var k in kategorieAuswertungenProjekt)
-                                        {
-                                            <tr>
-                                                <td>@k.KategorieName</td>
-                                                <td>@k.Durchschnitt.ToString("0.0")</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-
-                                <!-- ⭐ ALLE ANTWORTEN -->
+                                  <!-- ⭐ ALLE ANTWORTEN -->
                                 <h4 class="mt-4">Anzahl der Antworten per Kategorie</h4>
                                 <table class="table table-striped">
                                     <thead>
@@ -125,6 +105,28 @@
                                         }
                                     </tbody>
                                 </table>
+
+                                <!-- Tabelle Kategorien -->
+                                <h4 class="mt-4">Kategorien - Durchschnitt</h4>
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Kategorie</th>
+                                            <th>Durchschnitt</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var k in kategorieAuswertungenProjekt)
+                                        {
+                                            <tr>
+                                                <td>@k.KategorieName</td>
+                                                <td>@k.Durchschnitt.ToString("0.0")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+
+   
                             </div>
                         </div>
                     }
