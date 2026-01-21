@@ -137,12 +137,12 @@ else
 @code {
     private int editingProjectId = 0;
 
-    private Task OnModalSaved()
+    private async Task OnModalSaved()
     {
         editingProjectId = 0;
-        // reload details
-        Nav.NavigateTo(Nav.Uri, forceLoad: false);
-        return Task.CompletedTask;
+        // reload details inplace
+        await LoadAsync();
+        StateHasChanged();
     }
 
     private Task OnModalCancelled()

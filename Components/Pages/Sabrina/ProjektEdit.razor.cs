@@ -159,10 +159,20 @@ namespace ProActive2508.Components.Pages.Sabrina
             isSaving = true;
             try
             {
-                // Update Projekt
-                Db.Projekte.Update(editModel);
+                // Update Projekt safely: avoid duplicate tracked instances
+                var dbProj = await Db.Projekte.FindAsync(editModel.Id);
+                if (dbProj == null)
+                {
+                    // Projekt not tracked / not present -> add as new (should not normally happen for edit)
+                    Db.Projekte.Add(editModel);
+                }
+                else
+                {
+                    // Apply scalar property changes to the tracked entity
+                    Db.Entry(dbProj).CurrentValues.SetValues(editModel);
+                }
 
-                // Upsert ProjektPhasen (use ProjektId / PhaseId)
+                // Upsert ProjektPhasen (use ProjekteId / PhaseId)
                 List<ProjektPhase> existing = await Db.ProjektPhasen.Where(pp => pp.ProjekteId == editModel.Id).ToListAsync();
                 foreach (var sel in editPhaseSelections)
                 {
@@ -221,7 +231,15 @@ namespace ProActive2508.Components.Pages.Sabrina
                 await Db.SaveChangesAsync();
 
                 // fertig: Callback an Parent
-                if (OnSaved.HasDelegate) await OnSaved.InvokeAsync();
+                if (OnSaved.HasDelegate)
+                {
+                    await OnSaved.InvokeAsync();
+                }
+                else
+                {
+                    // Fallback: aktualisiere Seite / navigiere zur aktuellen URI
+                    Nav.NavigateTo(Nav.Uri, forceLoad: false);
+                }
             }
             catch (Exception ex)
             {
