@@ -29,7 +29,7 @@
             <CascadingAuthenticationState>
                 <AuthorizeView>
                     <Authorized Context="ctx">
-                        <span class="me-2">Hello, @ctx.User?.Identity?.Name!</span>
+                        <span class="me-2">@ctx.User?.Identity?.Name</span>
 
 
                         @* Logout per klassischem POST auf /auth/logout (setzt Cookie serverseitig) *@
@@ -45,7 +45,7 @@
                         </form>
                     </Authorized>
                     <NotAuthorized>
-                        <a href="/auth/login">Login</a>
+                       @*  <a href="/auth/login">Login</a> *@
                     </NotAuthorized>
                 </AuthorizeView>
             </CascadingAuthenticationState>

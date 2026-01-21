@@ -7,6 +7,9 @@
 main {
     flex: 1;
 }
+.me-2{
+    color: white;
+}
 
 .sidebar {
     background-image: linear-gradient(180deg, #74181E 0%, #000000 70%);
