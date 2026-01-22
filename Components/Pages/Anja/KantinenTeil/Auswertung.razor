@@ -1,7 +1,7 @@
-﻿@page "/auswertung-kantine"
+﻿@page "/kantine/auswertung-koch"
 
 @using ProActive2508.Data
-@using ProActive2508.Models.Entity.Anja
+@using ProActive2508.Models.Entity.Anja.Kantine
 @using Microsoft.EntityFrameworkCore
 
 @inject AppDbContext _context
@@ -9,8 +9,7 @@
 @rendermode InteractiveServer
 
 <div class="container mt-4">
-
-    <h2 class="mb-4">Auswertung</h2>
+    <h2 class="mb-4">Auswertung Küche</h2>
 
     @if (isLoading)
     {
@@ -18,393 +17,342 @@
     }
     else
     {
-        <!-- ⭐ GLOBALER PROJEKTVERGLEICH -->
+        <!-- ⭐ SEKTION 1: PREISE -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Gericht auswählen (Preisentwicklung)</strong>
+            </div>
+            <div class="card-body">
+                <select class="form-select w-auto" @onchange="OnGerichtChanged">
+                    <option value="">-- Bitte Gericht wählen --</option>
+                    @foreach (var g in gerichte)
+                    {
+                        <option value="@g.Id">@g.Gerichtname</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <!-- Preisentwicklung -->
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-light">
-                <strong>Projektvergleich – Durchschnitt pro Projekt (alle Projekte)</strong>
-                
+                <strong>Preisentwicklung pro Gericht</strong>
             </div>
-            
-
             <div class="card-body">
-                @if (projektDurchschnitte.Count == 0)
+                @if (selectedGerichtId == null || !preisverlaufSelected.Any())
                 {
-                    <p>Keine Antworten für die Projekte vorhanden.</p>
+                    <p>Bitte ein Gericht auswählen.</p>
                 }
                 else
                 {
-                    <canvas id="projektVergleichChart" style="height:100px !important;"></canvas>
-                    <p font-size="20"><strong>Antworten Anzahl (aller Projekte):</strong> @alleAntworten.Count</p>
-                    <!-- Debug optional -->
-                    <h5 class="mt-4">Debug: ProjektDurchschnitte</h5>
-                    <table class="table table-sm table-bordered" style="max-width:500px;">
-                        <thead>
-                            <tr>
-                                <th>ProjektId</th>
-                                <th>ProjektName</th>
-                                <th>Durchschnitt</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var p in projektDurchschnitte)
-                            {
-                                <tr>
-                                    <td>@p.ProjektId</td>
-                                    <td>@p.ProjektName</td>
-                                    <td>@p.Durchschnitt</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                    <canvas id="preisVerlaufChart" height="120"></canvas>
                 }
             </div>
         </div>
 
-        <!-- ⭐ DETAILANSICHT -->
-        @if (selectedProjectId != null && aktuellesProjekt != null)
-        {
-            <div class="card mb-4">
-                <div class="card-header">
-                    <strong>Detailauswertung – @aktuellesProjekt.Projektbeschreibung</strong>
-                </div>
-
-                <div class="card-body">
-
-                    <p><strong>Status:</strong> @aktuellesProjekt.Status</p>
-
-                    @if (antwortenProjekt.Count > 0)
-                    {
-                        <div class="row">
-                            <div class="col-lg-6">
-                                <!-- ⭐ STERNVERTEILUNG -->
-                                <h4 class="mt-4">Sternverteilung (Projekt)</h4>
-                                <canvas id="sternChart" height="200"></canvas>
-
-                                <!-- ⭐ KATEGORIE-AUSWERTUNG -->
-                                <h4 class="mt-4">Durchschnitt pro Kategorie</h4>
-                                <canvas id="kategorieChart" height="200"></canvas>
-                            </div>
-
-                            <div class="col-lg-6">
-                                  <!-- ⭐ ALLE ANTWORTEN -->
-                                <h4 class="mt-4">Anzahl der Antworten per Kategorie</h4>
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Kategorie</th>
-                                            <th>Anzahl der Antworten</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var k in kategorieAuswertungenProjekt)
-                                        {
-                                            <tr>
-                                                <td>@k.KategorieName</td>
-                                                <td>@k.Anzahl</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-
-                                <!-- Tabelle Kategorien -->
-                                <h4 class="mt-4">Kategorien - Durchschnitt</h4>
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Kategorie</th>
-                                            <th>Durchschnitt</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var k in kategorieAuswertungenProjekt)
-                                        {
-                                            <tr>
-                                                <td>@k.KategorieName</td>
-                                                <td>@k.Durchschnitt.ToString("0.0")</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-
-   
-                            </div>
-                        </div>
-                    }
-                    else
-                    {
-                        <p>Keine Antworten für dieses Projekt vorhanden.</p>
-                    }
-                </div>
-            </div>
-        }
-        else
-        {
-            <p class="mt-3">Bitte ein Projekt auswählen, um Details zu sehen.</p>
-        }
-
-        <!-- ⭐ PROJEKT-AUSWAHL -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <strong>Projekt auswählen (Detailansicht)</strong>
+        <!-- Preis vs Nachfrage -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-light">
+                <strong>Preis vs. Nachfrage (alle Gerichte)</strong>
             </div>
             <div class="card-body">
-                <select class="form-select w-auto"
-                        @onchange="OnProjectChanged">
-                    <option value="">-- Bitte wählen --</option>
-                    @foreach (var p in projektListe)
-                    {
-                        <option value="@p.Id">@p.Projektbeschreibung</option>
-                    }
-                </select>
+                <canvas id="preisNachfrageChart" height="140"></canvas>
+            </div>
+        </div>
+
+        <!-- ⭐ SEKTION 2: NACHFRAGE -->
+        <h3 class="mt-5 mb-3">Nachfrage</h3>
+
+        <!-- Beliebteste Gerichte -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-light">
+                <strong>Beliebteste Gerichte</strong>
+            </div>
+            <div class="card-body">
+                <canvas id="beliebtesteGerichteChart" height="140"></canvas>
+            </div>
+        </div>
+
+        <!-- Nachfrage pro Woche -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-light">
+                <strong>Nachfrage pro Woche</strong>
+            </div>
+            <div class="card-body">
+                <canvas id="nachfrageWocheChart" height="140"></canvas>
             </div>
         </div>
     }
 </div>
 
 @code {
-    // 🔹 ALLE DEINE ALTEN FELDER UND KLASSEN
-
     private bool isLoading = true;
 
-    // Globale Daten (alle Antworten)
-    private List<Antwort> alleAntworten = new();
-    private List<Projekt> projektListe = new();
+    private List<Gericht> gerichte = new();
+    private List<Preisverlauf> allePreisverlaeufe = new();
+    private List<Vorbestellung> vorbestellungen = new();
+    private List<Menueplan> menueplaene = new();
+    private List<MenueplanTag> menueplanTage = new();
 
-    // Globale Auswertungen
-    private List<ProjektDurchschnitt> projektDurchschnitte = new();
+    private int? selectedGerichtId = null;
+    private string? selectedGerichtName;
+    private List<Preisverlauf> preisverlaufSelected = new();
 
-    // Auswahl für Detail
-    private int? selectedProjectId = null;
-    private Projekt? aktuellesProjekt;
-    private List<Antwort> antwortenProjekt = new();
+    private List<PreisNachfrageItem> preisNachfrageItems = new();
+    private List<BeliebtheitItem> beliebtesteGerichte = new();
+    private List<NachfrageWocheItem> nachfrageProWoche = new();
 
-    // Sternverteilung pro Projekt
-    private List<RatingItem> ratingItemsProjekt = new();
-
-    // Kategorien pro Projekt
-    private List<KategorieAuswertung> kategorieAuswertungenProjekt = new();
-
-    // Hilfsklassen
-    private class RatingItem
+    public class PreisNachfrageItem
     {
-        public string Category { get; set; } = "";
-        public int Value { get; set; }
+        public string GerichtName { get; set; } = "";
+        public decimal Preis { get; set; }
+        public int Nachfrage { get; set; }
     }
 
-    public class KategorieAuswertung
+    public class BeliebtheitItem
     {
-        public string KategorieName { get; set; } = "";
-        public double Durchschnitt { get; set; }
+        public string GerichtName { get; set; } = "";
         public int Anzahl { get; set; }
-
     }
 
-    public class ProjektDurchschnitt
+    public class NachfrageWocheItem
     {
-        public int ProjektId { get; set; }
-        public string ProjektName { get; set; } = "";
-        public double Durchschnitt { get; set; }
+        public int Woche { get; set; }
+        public int Anzahl { get; set; }
     }
 
     protected override async Task OnInitializedAsync()
     {
         isLoading = true;
 
-        // Alle Projekte
-        projektListe = await _context.Projekte
-            .AsNoTracking()
-            .OrderBy(p => p.Id)
-            .ToListAsync();
+        gerichte = await _context.Gerichte.AsNoTracking().ToListAsync();
+        allePreisverlaeufe = await _context.Preisverlaeufe.AsNoTracking().ToListAsync();
+        vorbestellungen = await _context.Vorbestellungen.AsNoTracking().ToListAsync();
+        menueplaene = await _context.Menueplaene.AsNoTracking().ToListAsync();
+        menueplanTage = await _context.MenueplanTage.AsNoTracking().ToListAsync();
 
-        // Alle Antworten inkl. Projekt / Frage / Kategorie
-        alleAntworten = await _context.Antworten
-            .Include(a => a.Projekt)
-            .Include(a => a.Frage)
-                .ThenInclude(f => f.Kategorie)
-            .AsNoTracking()
-            .ToListAsync();
-
-        BerechneProjektDurchschnitte();
+        await BerechnePreisVsNachfrage();
+        await BerechneBeliebtesteGerichte();
+        await BerechneNachfrageProWoche();
 
         isLoading = false;
     }
 
-    private void BerechneProjektDurchschnitte()
+    private async Task BerechnePreisVsNachfrage()
     {
-        projektDurchschnitte = alleAntworten
-            .Where(a => a.Projekt != null)
-            .GroupBy(a => a.ProjektId)
-            .Select(g => new ProjektDurchschnitt
+        var joined = vorbestellungen
+            .Join(menueplaene,
+                v => v.EintragId,
+                m => m.Id,
+                (v, m) => new { m.GerichtId })
+            .GroupBy(x => x.GerichtId)
+            .Select(g => new { GerichtId = g.Key, Nachfrage = g.Count() })
+            .ToList();
+
+        var aktuellerPreis = allePreisverlaeufe
+            .GroupBy(p => p.GerichtId)
+            .Select(g => new
             {
-                ProjektId = g.Key,
-                ProjektName = g.First().Projekt!.Projektbeschreibung,
-                Durchschnitt = g.Average(a => a.Rating)
+                GerichtId = g.Key,
+                Preis = g.OrderByDescending(x => x.GueltigAb).First().Preis
             })
-            .OrderBy(p => p.ProjektId)
-            .ToList();
-    }
-
-    private async Task OnProjectChanged(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int id))
-            selectedProjectId = id;
-        else
-            selectedProjectId = null;
-
-        await LadeProjektDetails();
-    }
-
-    private async Task LadeProjektDetails()
-    {
-        if (selectedProjectId == null)
-        {
-            aktuellesProjekt = null;
-            antwortenProjekt.Clear();
-            ratingItemsProjekt.Clear();
-            kategorieAuswertungenProjekt.Clear();
-            return;
-        }
-
-        aktuellesProjekt = await _context.Projekte
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == selectedProjectId.Value);
-
-        antwortenProjekt = alleAntworten
-            .Where(a => a.ProjektId == selectedProjectId.Value)
             .ToList();
 
-        BerechneSternverteilungProjekt();
-        BerechneKategorieAuswertungProjekt();
-    }
-
-    private void BerechneSternverteilungProjekt()
-    {
-        var counts = new int[5];
-
-        foreach (var a in antwortenProjekt)
-        {
-            if (a.Rating >= 1 && a.Rating <= 5)
-                counts[a.Rating - 1]++;
-        }
-
-        ratingItemsProjekt = new()
-        {
-            new RatingItem { Category = "1 Stern", Value = counts[0] },
-            new RatingItem { Category = "2 Sterne", Value = counts[1] },
-            new RatingItem { Category = "3 Sterne", Value = counts[2] },
-            new RatingItem { Category = "4 Sterne", Value = counts[3] },
-            new RatingItem { Category = "5 Sterne", Value = counts[4] }
-        };
-    }
-
-    private void BerechneKategorieAuswertungProjekt()
-    {
-        kategorieAuswertungenProjekt = antwortenProjekt
-            .GroupBy(a => a.Frage.KategorieId)
-            .Select(g => new KategorieAuswertung
+        preisNachfrageItems = (
+            from g in gerichte
+            join p in aktuellerPreis on g.Id equals p.GerichtId
+            join n in joined on g.Id equals n.GerichtId into gj
+            from n in gj.DefaultIfEmpty()
+            select new PreisNachfrageItem
             {
-                KategorieName = g.First().Frage.Kategorie.Name,
-                Durchschnitt = g.Average(a => a.Rating),
+                GerichtName = g.Gerichtname,
+                Preis = p.Preis,
+                Nachfrage = n?.Nachfrage ?? 0
+            }
+        ).ToList();
+    }
+
+    private async Task BerechneBeliebtesteGerichte()
+    {
+        beliebtesteGerichte = vorbestellungen
+            .Join(menueplaene,
+                v => v.EintragId,
+                m => m.Id,
+                (v, m) => m.GerichtId)
+            .GroupBy(id => id)
+            .Select(g => new BeliebtheitItem
+            {
+                GerichtName = gerichte.First(x => x.Id == g.Key).Gerichtname,
                 Anzahl = g.Count()
             })
-            .OrderBy(k => k.KategorieName)
+            .OrderByDescending(x => x.Anzahl)
             .ToList();
     }
 
-    // 🔹 NEU: Chart.js Rendering
+    private async Task BerechneNachfrageProWoche()
+    {
+        nachfrageProWoche = vorbestellungen
+            .Join(menueplaene,
+                v => v.EintragId,
+                m => m.Id,
+                (v, m) => new { v, m.MenueplanTagId })
+            .Join(menueplanTage,
+                x => x.MenueplanTagId,
+                t => t.Id,
+                (x, t) => t.Tag)
+            .GroupBy(d => System.Globalization.CultureInfo.CurrentCulture.Calendar
+                .GetWeekOfYear(d, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday))
+            .Select(g => new NachfrageWocheItem
+            {
+                Woche = g.Key,
+                Anzahl = g.Count()
+            })
+            .OrderBy(x => x.Woche)
+            .ToList();
+    }
+
+    private async Task OnGerichtChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int id))
+        {
+            selectedGerichtId = id;
+            selectedGerichtName = gerichte.First(g => g.Id == id).Gerichtname;
+
+            preisverlaufSelected = allePreisverlaeufe
+                .Where(p => p.GerichtId == id)
+                .OrderBy(p => p.GueltigAb)
+                .ToList();
+        }
+        else
+        {
+            selectedGerichtId = null;
+            preisverlaufSelected.Clear();
+        }
+
+        await RenderCharts();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (projektDurchschnitte.Any())
-        {
-            await RenderProjektVergleichChart();
-        }
-
-        if (selectedProjectId != null && antwortenProjekt.Any())
-        {
-            await RenderSternChart();
-            await RenderKategorieChart();
-        }
+        if (!isLoading)
+            await RenderCharts();
     }
 
-    private async Task RenderProjektVergleichChart()
+    private async Task RenderCharts()
+    {
+        if (selectedGerichtId != null && preisverlaufSelected.Any())
+            await RenderPreisVerlaufChart();
+
+        if (preisNachfrageItems.Any())
+            await RenderPreisNachfrageChart();
+
+        if (beliebtesteGerichte.Any())
+            await RenderBeliebtesteGerichteChart();
+
+        if (nachfrageProWoche.Any())
+            await RenderNachfrageWocheChart();
+    }
+
+    private async Task RenderPreisVerlaufChart()
     {
         await JS.InvokeVoidAsync("chartFunctions.createChart",
-            "projektVergleichChart",
+            "preisVerlaufChart",
             "line",
             new
             {
-                labels = projektDurchschnitte.Select(p => p.ProjektName),
+                labels = preisverlaufSelected.Select(p => p.GueltigAb.ToString("dd.MM.yyyy")),
                 datasets = new[]
                 {
                     new {
-                        label = "Durchschnitt",
-                        data = projektDurchschnitte.Select(p => p.Durchschnitt),                   
+                        label = $"Preisverlauf – {selectedGerichtName}",
+                        data = preisverlaufSelected.Select(p => p.Preis),
                         borderColor = "#74181E",
                         backgroundColor = "rgba(116,24,30,0.25)",
                         borderWidth = 2,
-                        tension = 0.3,
+                        tension = 0.3
+                    }
+                }
+            },
+            new { responsive = true }
+        );
+    }
+
+    private async Task RenderPreisNachfrageChart()
+    {
+        var dataPoints = preisNachfrageItems.Select(i => new { x = i.Preis, y = i.Nachfrage });
+
+        await JS.InvokeVoidAsync("chartFunctions.createChart",
+            "preisNachfrageChart",
+            "scatter",
+            new
+            {
+                datasets = new[]
+                {
+                    new {
+                        label = "Preis vs. Nachfrage",
+                        data = dataPoints,
+                        backgroundColor = "rgba(116,24,30,0.6)",
+                        borderColor = "#74181E",
+                        pointRadius = 5
                     }
                 }
             },
             new
             {
                 responsive = true,
-
+                scales = new
+                {
+                    x = new { title = new { display = true, text = "Preis (€)" } },
+                    y = new { title = new { display = true, text = "Vorbestellungen" }, beginAtZero = true }
+                }
             }
         );
     }
 
-    private async Task RenderSternChart()
+    private async Task RenderBeliebtesteGerichteChart()
     {
         await JS.InvokeVoidAsync("chartFunctions.createChart",
-            "sternChart",
+            "beliebtesteGerichteChart",
             "bar",
             new
             {
-                labels = ratingItemsProjekt.Select(r => r.Category),
+                labels = beliebtesteGerichte.Select(x => x.GerichtName),
                 datasets = new[]
                 {
                     new {
-                        label = "Bewertungen",
-                        data = ratingItemsProjekt.Select(r => r.Value),
+                        label = "Vorbestellungen",
+                        data = beliebtesteGerichte.Select(x => x.Anzahl),
                         backgroundColor = "#74181E88",
                         borderColor = "#74181E",
                         borderWidth = 2
                     }
                 }
             },
-            new
-            {
-                responsive = true
-            }
+            new { responsive = true }
         );
     }
 
-    private async Task RenderKategorieChart()
+    private async Task RenderNachfrageWocheChart()
     {
         await JS.InvokeVoidAsync("chartFunctions.createChart",
-            "kategorieChart",
-            "bar",
+            "nachfrageWocheChart",
+            "line",
             new
             {
-                labels = kategorieAuswertungenProjekt.Select(k => k.KategorieName),
+                labels = nachfrageProWoche.Select(x => $"KW {x.Woche}"),
                 datasets = new[]
                 {
                     new {
-                        label = "Durchschnitt",
-                        data = kategorieAuswertungenProjekt.Select(k => k.Durchschnitt),
-                        backgroundColor = "#74181E88",
+                        label = "Vorbestellungen pro Woche",
+                        data = nachfrageProWoche.Select(x => x.Anzahl),
                         borderColor = "#74181E",
-                        borderWidth = 2
+                        backgroundColor = "rgba(116,24,30,0.25)",
+                        borderWidth = 2,
+                        tension = 0.3
                     }
                 }
             },
-            new
-            {
-                indexAxis = "y",
-                responsive = true
-            }
+            new { responsive = true }
         );
     }
 }
