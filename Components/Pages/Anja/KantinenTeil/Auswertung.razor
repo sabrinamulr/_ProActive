@@ -33,7 +33,6 @@
             </div>
         </div>
 
-        <!-- Preisentwicklung -->
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-light">
                 <strong>Preisentwicklung pro Gericht</strong>
@@ -50,7 +49,6 @@
             </div>
         </div>
 
-        <!-- Preis vs Nachfrage -->
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-light">
                 <strong>Preis vs. Nachfrage (alle Gerichte)</strong>
@@ -63,7 +61,6 @@
         <!-- ⭐ SEKTION 2: NACHFRAGE -->
         <h3 class="mt-5 mb-3">Nachfrage</h3>
 
-        <!-- Beliebteste Gerichte -->
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-light">
                 <strong>Beliebteste Gerichte</strong>
@@ -73,13 +70,34 @@
             </div>
         </div>
 
-        <!-- Nachfrage pro Woche -->
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-light">
                 <strong>Nachfrage pro Woche</strong>
             </div>
             <div class="card-body">
                 <canvas id="nachfrageWocheChart" height="140"></canvas>
+            </div>
+        </div>
+
+        <!-- ⭐ SEKTION 3: ALLERGENE -->
+        <h3 class="mt-5 mb-3">Allergene</h3>
+
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-light">
+                <strong>Allergene-Verteilung</strong>
+            </div>
+            <div class="card-body">
+                <canvas id="allergeneChart" height="300"></canvas>
+            </div>
+        </div>
+
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-light">
+                <strong>Allergenfreie Gerichte</strong>
+            </div>
+            <div class="card-body">
+                <h2 class="text-success fw-bold">@anzahlAllergenfrei</h2>
+                <p>Gerichte enthalten keinerlei Allergene.</p>
             </div>
         </div>
     }
@@ -93,6 +111,8 @@
     private List<Vorbestellung> vorbestellungen = new();
     private List<Menueplan> menueplaene = new();
     private List<MenueplanTag> menueplanTage = new();
+    private List<GerichtAllergen> gerichtAllergene = new();
+    private List<Allergen> allergene = new();
 
     private int? selectedGerichtId = null;
     private string? selectedGerichtName;
@@ -102,24 +122,13 @@
     private List<BeliebtheitItem> beliebtesteGerichte = new();
     private List<NachfrageWocheItem> nachfrageProWoche = new();
 
-    public class PreisNachfrageItem
-    {
-        public string GerichtName { get; set; } = "";
-        public decimal Preis { get; set; }
-        public int Nachfrage { get; set; }
-    }
+    private List<AllergenVerteilungItem> allergenVerteilung = new();
+    private int anzahlAllergenfrei = 0;
 
-    public class BeliebtheitItem
-    {
-        public string GerichtName { get; set; } = "";
-        public int Anzahl { get; set; }
-    }
-
-    public class NachfrageWocheItem
-    {
-        public int Woche { get; set; }
-        public int Anzahl { get; set; }
-    }
+    public class PreisNachfrageItem { public string GerichtName { get; set; } = ""; public decimal Preis { get; set; } public int Nachfrage { get; set; } }
+    public class BeliebtheitItem { public string GerichtName { get; set; } = ""; public int Anzahl { get; set; } }
+    public class NachfrageWocheItem { public int Woche { get; set; } public int Anzahl { get; set; } }
+    public class AllergenVerteilungItem { public string Name { get; set; } = ""; public int Anzahl { get; set; } }
 
     protected override async Task OnInitializedAsync()
     {
@@ -130,10 +139,13 @@
         vorbestellungen = await _context.Vorbestellungen.AsNoTracking().ToListAsync();
         menueplaene = await _context.Menueplaene.AsNoTracking().ToListAsync();
         menueplanTage = await _context.MenueplanTage.AsNoTracking().ToListAsync();
+        gerichtAllergene = await _context.GerichtAllergene.AsNoTracking().ToListAsync();
+        allergene = await _context.Allergene.AsNoTracking().ToListAsync();
 
         await BerechnePreisVsNachfrage();
         await BerechneBeliebtesteGerichte();
         await BerechneNachfrageProWoche();
+        await BerechneAllergene();
 
         isLoading = false;
     }
@@ -141,21 +153,14 @@
     private async Task BerechnePreisVsNachfrage()
     {
         var joined = vorbestellungen
-            .Join(menueplaene,
-                v => v.EintragId,
-                m => m.Id,
-                (v, m) => new { m.GerichtId })
+            .Join(menueplaene, v => v.EintragId, m => m.Id, (v, m) => new { m.GerichtId })
             .GroupBy(x => x.GerichtId)
             .Select(g => new { GerichtId = g.Key, Nachfrage = g.Count() })
             .ToList();
 
         var aktuellerPreis = allePreisverlaeufe
             .GroupBy(p => p.GerichtId)
-            .Select(g => new
-            {
-                GerichtId = g.Key,
-                Preis = g.OrderByDescending(x => x.GueltigAb).First().Preis
-            })
+            .Select(g => new { GerichtId = g.Key, Preis = g.OrderByDescending(x => x.GueltigAb).First().Preis })
             .ToList();
 
         preisNachfrageItems = (
@@ -175,10 +180,7 @@
     private async Task BerechneBeliebtesteGerichte()
     {
         beliebtesteGerichte = vorbestellungen
-            .Join(menueplaene,
-                v => v.EintragId,
-                m => m.Id,
-                (v, m) => m.GerichtId)
+            .Join(menueplaene, v => v.EintragId, m => m.Id, (v, m) => m.GerichtId)
             .GroupBy(id => id)
             .Select(g => new BeliebtheitItem
             {
@@ -192,23 +194,29 @@
     private async Task BerechneNachfrageProWoche()
     {
         nachfrageProWoche = vorbestellungen
-            .Join(menueplaene,
-                v => v.EintragId,
-                m => m.Id,
-                (v, m) => new { v, m.MenueplanTagId })
-            .Join(menueplanTage,
-                x => x.MenueplanTagId,
-                t => t.Id,
-                (x, t) => t.Tag)
+            .Join(menueplaene, v => v.EintragId, m => m.Id, (v, m) => new { v, m.MenueplanTagId })
+            .Join(menueplanTage, x => x.MenueplanTagId, t => t.Id, (x, t) => t.Tag)
             .GroupBy(d => System.Globalization.CultureInfo.CurrentCulture.Calendar
                 .GetWeekOfYear(d, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday))
-            .Select(g => new NachfrageWocheItem
-            {
-                Woche = g.Key,
-                Anzahl = g.Count()
-            })
+            .Select(g => new NachfrageWocheItem { Woche = g.Key, Anzahl = g.Count() })
             .OrderBy(x => x.Woche)
             .ToList();
+    }
+
+    private async Task BerechneAllergene()
+    {
+        allergenVerteilung = gerichtAllergene
+            .GroupBy(a => a.AllergenId)
+            .Select(g => new AllergenVerteilungItem
+            {
+                Name = allergene.First(x => x.Id == g.Key).Kuerzel,
+                Anzahl = g.Count()
+            })
+            .OrderByDescending(x => x.Anzahl)
+            .ToList();
+
+        anzahlAllergenfrei = gerichte
+            .Count(g => !gerichtAllergene.Any(a => a.GerichtId == g.Id));
     }
 
     private async Task OnGerichtChanged(ChangeEventArgs e)
@@ -251,6 +259,9 @@
 
         if (nachfrageProWoche.Any())
             await RenderNachfrageWocheChart();
+
+        if (allergenVerteilung.Any())
+            await RenderAllergeneChart();
     }
 
     private async Task RenderPreisVerlaufChart()
@@ -353,6 +364,32 @@
                 }
             },
             new { responsive = true }
+        );
+    }
+
+    private async Task RenderAllergeneChart()
+    {
+        await JS.InvokeVoidAsync("chartFunctions.createChart",
+            "allergeneChart",
+            "pie",
+            new
+            {
+                labels = allergenVerteilung.Select(x => x.Name),
+                datasets = new[]
+                {
+                    new {
+                        label = "Allergene",
+                        data = allergenVerteilung.Select(x => x.Anzahl),
+                        backgroundColor = new[]
+                        {
+                            "#74181E", "#A63A3A", "#D96C6C", "#F2A2A2",
+                            "#C27BA0", "#8E44AD", "#5DADE2", "#48C9B0"
+                        }
+                    }
+                }
+            },
+            new { responsive = true, maintainAspectRatio = false}
+            
         );
     }
 }
