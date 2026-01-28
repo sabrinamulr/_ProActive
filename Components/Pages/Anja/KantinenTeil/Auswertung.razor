@@ -6,10 +6,16 @@
 
 @inject AppDbContext _context
 @inject IJSRuntime JS
+@inject PdfAuswertung PdfService
+
 @rendermode InteractiveServer
 
 <div class="container mt-4">
     <h2 class="mb-4">Auswertung Küche</h2>
+
+<button class="btn btn-danger mb-4" @onclick="ExportPdfAsync" disabled="@isLoading">
+    PDF exportieren
+</button>
 
     @if (isLoading)
     {
@@ -30,6 +36,7 @@
                         <option value="@g.Id">@g.Gerichtname</option>
                     }
                 </select>
+
                 @if (selectedGerichtId == null || !preisverlaufSelected.Any())
                 {
                     <p>Gericht nicht ausgewählt</p>
@@ -67,7 +74,7 @@
                 <strong>Nachfrage pro Woche</strong>
             </div>
             <div class="card-body">
-                <canvas id="nachfrageWocheChart" height="140"></canvas>
+                <canvas id="nachfrageWWocheChart" height="140"></canvas>
             </div>
         </div>
 
@@ -370,8 +377,33 @@
                     }
                 }
             },
-            new { responsive = true, maintainAspectRatio = false}
-            
+            new { responsive = true, maintainAspectRatio = false }
         );
+    }
+
+    // ⭐ PDF EXPORT
+    private async Task ExportPdfAsync()
+    {
+        string preisVerlaufImg = await JS.InvokeAsync<string>("chartFunctions.getChartImage", "preisVerlaufChart");
+        string preisNachfrageImg = await JS.InvokeAsync<string>("chartFunctions.getChartImage", "preisNachfrageChart");
+        string beliebtesteImg = await JS.InvokeAsync<string>("chartFunctions.getChartImage", "beliebtesteGerichteChart");
+        string nachfrageWocheImg = await JS.InvokeAsync<string>("chartFunctions.getChartImage", "nachfrageWocheChart");
+        string allergeneImg = await JS.InvokeAsync<string>("chartFunctions.getChartImage", "allergeneChart");
+
+        byte[] pdf = PdfService.BuildKochAuswertungPdf(
+            preisVerlaufImg,
+            preisNachfrageImg,
+            beliebtesteImg,
+            nachfrageWocheImg,
+            allergeneImg,
+            preisNachfrageItems,
+            beliebtesteGerichte,
+            nachfrageProWoche,
+            allergenVerteilung
+        );
+
+
+        string base64 = Convert.ToBase64String(pdf);
+        await JS.InvokeVoidAsync("downloadFileFromBytes", "KochAuswertung.pdf", base64);
     }
 }

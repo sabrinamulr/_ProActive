@@ -34,6 +34,8 @@ builder.Services.AddSingleton<IMenuplanPdfService, MenuplanPdfService>();
 builder.Services.AddScoped<Umfrage>();
 builder.Services.AddRadzenComponents();
 
+builder.Services.AddScoped<PdfAuswertung>();
+
 // Cookies
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>
