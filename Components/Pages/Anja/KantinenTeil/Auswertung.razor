@@ -30,17 +30,9 @@
                         <option value="@g.Id">@g.Gerichtname</option>
                     }
                 </select>
-            </div>
-        </div>
-
-        <div class="card mb-4 shadow-sm">
-            <div class="card-header bg-light">
-                <strong>Preisentwicklung pro Gericht</strong>
-            </div>
-            <div class="card-body">
                 @if (selectedGerichtId == null || !preisverlaufSelected.Any())
                 {
-                    <p>Bitte ein Gericht auswählen.</p>
+                    <p>Gericht nicht ausgewählt</p>
                 }
                 else
                 {
@@ -84,20 +76,10 @@
 
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-light">
-                <strong>Allergene-Verteilung</strong>
+                <strong>Allergene Verteilung</strong>
             </div>
             <div class="card-body">
                 <canvas id="allergeneChart" height="300"></canvas>
-            </div>
-        </div>
-
-        <div class="card mb-4 shadow-sm">
-            <div class="card-header bg-light">
-                <strong>Allergenfreie Gerichte</strong>
-            </div>
-            <div class="card-body">
-                <h2 class="text-success fw-bold">@anzahlAllergenfrei</h2>
-                <p>Gerichte enthalten keinerlei Allergene.</p>
             </div>
         </div>
     }
