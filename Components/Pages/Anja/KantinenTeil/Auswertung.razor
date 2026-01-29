@@ -6,16 +6,11 @@
 
 @inject AppDbContext _context
 @inject IJSRuntime JS
-@inject PdfAuswertung PdfService
 
 @rendermode InteractiveServer
 
 <div class="container mt-4">
     <h2 class="mb-4">Auswertung Küche</h2>
-
-<button class="btn btn-danger mb-4" @onclick="ExportPdfAsync" disabled="@isLoading">
-    PDF exportieren
-</button>
 
     @if (isLoading)
     {
@@ -255,7 +250,7 @@
 
     private async Task RenderPreisVerlaufChart()
     {
-        await JS.InvokeVoidAsync("chartFunctions.createChart",
+        await JS.InvokeVoidAsync("createChart",
             "preisVerlaufChart",
             "line",
             new
@@ -281,7 +276,7 @@
     {
         var dataPoints = preisNachfrageItems.Select(i => new { x = i.Preis, y = i.Nachfrage });
 
-        await JS.InvokeVoidAsync("chartFunctions.createChart",
+        await JS.InvokeVoidAsync("createChart",
             "preisNachfrageChart",
             "scatter",
             new
@@ -311,7 +306,7 @@
 
     private async Task RenderBeliebtesteGerichteChart()
     {
-        await JS.InvokeVoidAsync("chartFunctions.createChart",
+        await JS.InvokeVoidAsync("createChart",
             "beliebtesteGerichteChart",
             "bar",
             new
@@ -334,7 +329,7 @@
 
     private async Task RenderNachfrageWocheChart()
     {
-        await JS.InvokeVoidAsync("chartFunctions.createChart",
+        await JS.InvokeVoidAsync("createChart",
             "nachfrageWocheChart",
             "line",
             new
@@ -358,7 +353,7 @@
 
     private async Task RenderAllergeneChart()
     {
-        await JS.InvokeVoidAsync("chartFunctions.createChart",
+        await JS.InvokeVoidAsync("createChart",
             "allergeneChart",
             "pie",
             new
@@ -381,29 +376,4 @@
         );
     }
 
-    // ⭐ PDF EXPORT
-    private async Task ExportPdfAsync()
-    {
-        string preisVerlaufImg = await JS.InvokeAsync<string>("chartFunctions.getChartImage", "preisVerlaufChart");
-        string preisNachfrageImg = await JS.InvokeAsync<string>("chartFunctions.getChartImage", "preisNachfrageChart");
-        string beliebtesteImg = await JS.InvokeAsync<string>("chartFunctions.getChartImage", "beliebtesteGerichteChart");
-        string nachfrageWocheImg = await JS.InvokeAsync<string>("chartFunctions.getChartImage", "nachfrageWocheChart");
-        string allergeneImg = await JS.InvokeAsync<string>("chartFunctions.getChartImage", "allergeneChart");
-
-        byte[] pdf = PdfService.BuildKochAuswertungPdf(
-            preisVerlaufImg,
-            preisNachfrageImg,
-            beliebtesteImg,
-            nachfrageWocheImg,
-            allergeneImg,
-            preisNachfrageItems,
-            beliebtesteGerichte,
-            nachfrageProWoche,
-            allergenVerteilung
-        );
-
-
-        string base64 = Convert.ToBase64String(pdf);
-        await JS.InvokeVoidAsync("downloadFileFromBytes", "KochAuswertung.pdf", base64);
-    }
 }

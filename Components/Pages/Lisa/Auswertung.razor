@@ -329,7 +329,7 @@
 
     private async Task RenderProjektVergleichChart()
     {
-        await JS.InvokeVoidAsync("chartFunctions.createChart",
+        await JS.InvokeVoidAsync("createChart",
             "projektVergleichChart",
             "line",
             new
@@ -357,7 +357,7 @@
 
     private async Task RenderSternChart()
     {
-        await JS.InvokeVoidAsync("chartFunctions.createChart",
+        await JS.InvokeVoidAsync("createChart",
             "sternChart",
             "bar",
             new
@@ -383,7 +383,7 @@
 
     private async Task RenderKategorieChart()
     {
-        await JS.InvokeVoidAsync("chartFunctions.createChart",
+        await JS.InvokeVoidAsync("createChart",
             "kategorieChart",
             "bar",
             new
