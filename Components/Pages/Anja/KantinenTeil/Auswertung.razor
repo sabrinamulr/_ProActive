@@ -26,7 +26,7 @@
             <div class="card-body">
                 <select class="form-select w-auto" @onchange="OnGerichtChanged">
                     <option value="">-- Bitte Gericht wählen --</option>
-                    @foreach (var g in gerichte)
+                    @foreach (Gericht g in gerichte)
                     {
                         <option value="@g.Id">@g.Gerichtname</option>
                     }
@@ -61,15 +61,6 @@
             </div>
             <div class="card-body">
                 <canvas id="beliebtesteGerichteChart" height="140"></canvas>
-            </div>
-        </div>
-
-        <div class="card mb-4 shadow-sm">
-            <div class="card-header bg-light">
-                <strong>Nachfrage pro Woche</strong>
-            </div>
-            <div class="card-body">
-                <canvas id="nachfrageWWocheChart" height="140"></canvas>
             </div>
         </div>
 
@@ -128,80 +119,234 @@
 
         await BerechnePreisVsNachfrage();
         await BerechneBeliebtesteGerichte();
-        await BerechneNachfrageProWoche();
         await BerechneAllergene();
 
         isLoading = false;
     }
 
-    private async Task BerechnePreisVsNachfrage()
+private async Task BerechnePreisVsNachfrage()
+{
+    // 1. JOIN: Vorbestellungen + Menüpläne
+    List<int> joinedGerichte = new List<int>(); 
+    // Liste aller Gericht-IDs, die vorbestellt wurden
+
+    foreach (Vorbestellung v in vorbestellungen)
     {
-        var joined = vorbestellungen
-            .Join(menueplaene, v => v.EintragId, m => m.Id, (v, m) => new { m.GerichtId })
-            .GroupBy(x => x.GerichtId)
-            .Select(g => new { GerichtId = g.Key, Nachfrage = g.Count() })
-            .ToList();
-
-        var aktuellerPreis = allePreisverlaeufe
-            .GroupBy(p => p.GerichtId)
-            .Select(g => new { GerichtId = g.Key, Preis = g.OrderByDescending(x => x.GueltigAb).First().Preis })
-            .ToList();
-
-        preisNachfrageItems = (
-            from g in gerichte
-            join p in aktuellerPreis on g.Id equals p.GerichtId
-            join n in joined on g.Id equals n.GerichtId into gj
-            from n in gj.DefaultIfEmpty()
-            select new PreisNachfrageItem
+        foreach (Menueplan m in menueplaene)
+        {
+            if (v.EintragId == m.Id) // Join-Bedingung
             {
-                GerichtName = g.Gerichtname,
-                Preis = p.Preis,
-                Nachfrage = n?.Nachfrage ?? 0
+                joinedGerichte.Add(m.GerichtId);
             }
-        ).ToList();
+        }
     }
 
-    private async Task BerechneBeliebtesteGerichte()
+    // 2. Gruppieren nach GerichtId
+    Dictionary<int, int> nachfrageProGericht = new Dictionary<int, int>();
+
+    foreach (int gerichtId in joinedGerichte)
     {
-        beliebtesteGerichte = vorbestellungen
-            .Join(menueplaene, v => v.EintragId, m => m.Id, (v, m) => m.GerichtId)
-            .GroupBy(id => id)
-            .Select(g => new BeliebtheitItem
+        if (!nachfrageProGericht.ContainsKey(gerichtId))
+        {
+            nachfrageProGericht[gerichtId] = 0;
+        }
+
+        nachfrageProGericht[gerichtId]++; // Nachfrage erhöhen
+    }
+
+    // 3. Aktuellen Preis pro Gericht bestimmen
+    Dictionary<int, decimal> aktuellerPreis = new Dictionary<int, decimal>();
+
+    foreach (Preisverlauf preis in allePreisverlaeufe)
+    {
+        int gerichtId = preis.GerichtId;
+
+        // Wenn Gericht noch nicht drin ist --> hinzufügen
+        if (!aktuellerPreis.ContainsKey(gerichtId))
+        {
+            aktuellerPreis[gerichtId] = preis.Preis;
+        }
+        else
+        {
+            // neueren Preis finden (GueltigAb vergleichen)
+            Preisverlauf neuester = null;
+
+            foreach (Preisverlauf p in allePreisverlaeufe)
             {
-                GerichtName = gerichte.First(x => x.Id == g.Key).Gerichtname,
-                Anzahl = g.Count()
-            })
-            .OrderByDescending(x => x.Anzahl)
-            .ToList();
+                if (p.GerichtId == gerichtId)
+                {
+                    if (neuester == null || p.GueltigAb > neuester.GueltigAb)
+                    {
+                        neuester = p;
+                    }
+                }
+            }
+
+            aktuellerPreis[gerichtId] = neuester.Preis;
+        }
     }
 
-    private async Task BerechneNachfrageProWoche()
-    {
-        nachfrageProWoche = vorbestellungen
-            .Join(menueplaene, v => v.EintragId, m => m.Id, (v, m) => new { v, m.MenueplanTagId })
-            .Join(menueplanTage, x => x.MenueplanTagId, t => t.Id, (x, t) => t.Tag)
-            .GroupBy(d => System.Globalization.CultureInfo.CurrentCulture.Calendar
-                .GetWeekOfYear(d, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday))
-            .Select(g => new NachfrageWocheItem { Woche = g.Key, Anzahl = g.Count() })
-            .OrderBy(x => x.Woche)
-            .ToList();
-    }
+    // 4. Ergebnisliste zusammenbauen
+    preisNachfrageItems = new List<PreisNachfrageItem>();
 
-    private async Task BerechneAllergene()
+    foreach (Gericht g in gerichte)
     {
-        allergenVerteilung = gerichtAllergene
-            .GroupBy(a => a.AllergenId)
-            .Select(g => new AllergenVerteilungItem
+        PreisNachfrageItem item = new PreisNachfrageItem();
+        item.GerichtName = g.Gerichtname;
+
+        // Preis holen
+        if (aktuellerPreis.ContainsKey(g.Id))
+        {
+            item.Preis = aktuellerPreis[g.Id];
+        }
+
+        // Nachfrage holen
+        if (nachfrageProGericht.ContainsKey(g.Id))
+        {
+            item.Nachfrage = nachfrageProGericht[g.Id];
+        }
+        else
+        {
+            item.Nachfrage = 0;
+        }
+
+        preisNachfrageItems.Add(item);
+    }
+}
+
+private async Task BerechneBeliebtesteGerichte()
+{
+    // 1. JOIN: Vorbestellungen + Menüpläne
+    List<int> gerichtIds = new List<int>();
+
+    foreach (Vorbestellung v in vorbestellungen)
+    {
+        foreach (Menueplan m in menueplaene)
+        {
+            if (v.EintragId == m.Id)
             {
-                Name = allergene.First(x => x.Id == g.Key).Kuerzel,
-                Anzahl = g.Count()
-            })
-            .OrderByDescending(x => x.Anzahl)
-            .ToList();
-
-        anzahlAllergenfrei = gerichte
-            .Count(g => !gerichtAllergene.Any(a => a.GerichtId == g.Id));
+                gerichtIds.Add(m.GerichtId);
+            }
+        }
     }
+
+    // 2. Gruppieren nach GerichtId
+    Dictionary<int, int> anzahlProGericht = new Dictionary<int, int>();
+
+    foreach (int id in gerichtIds)
+    {
+        if (!anzahlProGericht.ContainsKey(id))
+        {
+            anzahlProGericht[id] = 0;
+        }
+
+        anzahlProGericht[id]++;
+    }
+
+    // 3. Ergebnisliste erstellen
+    List<BeliebtheitItem> liste = new List<BeliebtheitItem>();
+
+    foreach (var eintrag in anzahlProGericht)
+    {
+        int gerichtId = eintrag.Key;
+        int anzahl = eintrag.Value;
+
+        Gericht gericht = null;
+
+        foreach (Gericht g in gerichte)
+        {
+            if (g.Id == gerichtId)
+            {
+                gericht = g;
+                break;
+            }
+        }
+
+        BeliebtheitItem item = new BeliebtheitItem();
+        item.GerichtName = gericht.Gerichtname;
+        item.Anzahl = anzahl;
+
+        liste.Add(item);
+    }
+
+    // 4. Sortieren nach Anzahl (DESC)
+    liste.Sort((BeliebtheitItem x, BeliebtheitItem y) => y.Anzahl.CompareTo(x.Anzahl));
+
+    beliebtesteGerichte = liste;
+}
+
+private async Task BerechneAllergene()
+{
+    // 1. Gruppieren nach AllergenId
+    Dictionary<int, int> allergenZaehler = new Dictionary<int, int>();
+
+    foreach (GerichtAllergen ga in gerichtAllergene)
+    {
+        int allergenId = ga.AllergenId;
+
+        if (!allergenZaehler.ContainsKey(allergenId))
+        {
+            allergenZaehler[allergenId] = 0;
+        }
+
+        allergenZaehler[allergenId]++;
+    }
+
+    // 2. Ergebnisliste erstellen
+    List<AllergenVerteilungItem> liste = new List<AllergenVerteilungItem>();
+
+    foreach (var eintrag in allergenZaehler)
+    {
+        int allergenId = eintrag.Key;
+        int anzahl = eintrag.Value;
+
+        Allergen allergen = null;
+
+        foreach (Allergen a in allergene)
+        {
+            if (a.Id == allergenId)
+            {
+                allergen = a;
+                break;
+            }
+        }
+
+        AllergenVerteilungItem item = new AllergenVerteilungItem();
+        item.Name = allergen.Kuerzel;
+        item.Anzahl = anzahl;
+
+        liste.Add(item);
+    }
+
+    // 3. Sortieren nach Anzahl (DESC)
+    liste.Sort((AllergenVerteilungItem x, AllergenVerteilungItem y) => y.Anzahl.CompareTo(x.Anzahl));
+
+    allergenVerteilung = liste;
+
+    // 4. Anzahl allergenfreier Gerichte
+    int count = 0;
+
+    foreach (Gericht g in gerichte)
+    {
+        bool hatAllergen = false;
+
+        foreach (GerichtAllergen ga in gerichtAllergene)
+        {
+            if (ga.GerichtId == g.Id)
+            {
+                hatAllergen = true;
+                break;
+            }
+        }
+
+        if (!hatAllergen)
+        {
+            count++;
+        }
+    }
+
+    anzahlAllergenfrei = count;
+}
 
     private async Task OnGerichtChanged(ChangeEventArgs e)
     {
@@ -241,8 +386,6 @@
         if (beliebtesteGerichte.Any())
             await RenderBeliebtesteGerichteChart();
 
-        if (nachfrageProWoche.Any())
-            await RenderNachfrageWocheChart();
 
         if (allergenVerteilung.Any())
             await RenderAllergeneChart();
@@ -327,29 +470,7 @@
         );
     }
 
-    private async Task RenderNachfrageWocheChart()
-    {
-        await JS.InvokeVoidAsync("createChart",
-            "nachfrageWocheChart",
-            "line",
-            new
-            {
-                labels = nachfrageProWoche.Select(x => $"KW {x.Woche}"),
-                datasets = new[]
-                {
-                    new {
-                        label = "Vorbestellungen pro Woche",
-                        data = nachfrageProWoche.Select(x => x.Anzahl),
-                        borderColor = "#74181E",
-                        backgroundColor = "rgba(116,24,30,0.25)",
-                        borderWidth = 2,
-                        tension = 0.3
-                    }
-                }
-            },
-            new { responsive = true }
-        );
-    }
+   
 
     private async Task RenderAllergeneChart()
     {
