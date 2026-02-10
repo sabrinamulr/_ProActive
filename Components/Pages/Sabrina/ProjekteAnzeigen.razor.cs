@@ -78,7 +78,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                 {
                     projects = await Db.Projekte
                         .AsNoTracking()
-                        //.Include(p => p.PhaseDefinition)
+                        
                         .OrderBy(p => p.Id)
                         .ToListAsync();
                 }
@@ -89,12 +89,12 @@ namespace ProActive2508.Components.Pages.Sabrina
                         .Where(p => p.ProjektleiterId == CurrentUserId
                                  || p.AuftraggeberId == CurrentUserId
                                  || memberProjectIds.Contains(p.Id))
-                        //.Include(p => p.PhaseDefinition)
+                   
                         .OrderBy(p => p.Id)
                         .ToListAsync();
                 }
 
-                // userLookup
+               
                 if (projects != null && projects.Any())
                 {
                     List<int> userIds = projects.SelectMany(p => new[] { p.ProjektleiterId, p.AuftraggeberId })
@@ -202,8 +202,6 @@ namespace ProActive2508.Components.Pages.Sabrina
             public int VerantwortlicherBenutzerId { get; set; }
             public string? Notizen { get; set; }
             public string? Status { get; set; }
-
-            // Neu: Kennzeichnet, ob der aktuelle Benutzer diese Phase im UI bearbeiten darf
             public bool CanEdit { get; set; }
         }
     }

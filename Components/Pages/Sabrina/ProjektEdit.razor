@@ -31,11 +31,58 @@ else
                 else if (editModel != null)
                 {
                     <EditForm Model="editModel" OnValidSubmit="SaveAsync" FormName="ProjektEditForm">
-                        <DataAnnotationsValidator />
+                        <DataAnnotationsValidator/>
                         <div class="modal-body">
                             <div class="mb-3">
                                 <label class="form-label">Beschreibung</label>
                                 <InputTextArea class="form-control" @bind-Value="editModel.Projektbeschreibung" rows="4" />
+                            </div>
+
+                            <hr />
+                            <h6>Mitglieder</h6>
+
+                            <div class="mb-3">
+                                <label class="form-label">Auswählen </label>
+                                <div class="border rounded p-2" style="max-height:220px; overflow:auto;">
+                                    @if (allUsers != null && allUsers.Any())
+                                    {
+                                        @foreach (var u in allUsers)
+                                        {
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="mem_@u.Id" checked="@selectedMemberIds.Contains(u.Id)" @onchange="@((ChangeEventArgs e) => ToggleMember(u.Id, (e?.Value as bool?) == true))" />
+                                                <label class="form-check-label" for="mem_@u.Id">@u.Email</label>
+                                            </div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <div class="text-muted">Keine Benutzer vorhanden.</div>
+                                    }
+                                </div>
+                                
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Aktuelle Mitglieder</label>
+                                <div>
+                                    @if (selectedMemberIds == null || !selectedMemberIds.Any())
+                                    {
+                                        <div class="text-muted">Keine Mitglieder ausgewählt.</div>
+                                    }
+                                    else
+                                    {
+                                        <ul class="list-group">
+                                            @foreach (var uid in selectedMemberIds)
+                                            {
+                                                var usr = allUsers.FirstOrDefault(x => x.Id == uid);
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    <div>@(usr?.Email ?? $"Id:{uid}")</div>
+                                                    <button class="btn btn-sm btn-outline-danger" type="button" @onclick="@(() => RemoveMember(uid))">Entfernen</button>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </div>
                             </div>
 
                             @if (editPhaseSelections != null && editPhaseSelections.Any())
@@ -91,3 +138,4 @@ else
         </div>
     </div>
 }
+

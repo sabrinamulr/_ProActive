@@ -32,6 +32,12 @@ namespace ProActive2508.Components.Pages.Sabrina
         protected List<Aufgabe> projektAufgaben = new List<Aufgabe>();
         protected Dictionary<int, string> aufgabenBenutzerLookup = new();
 
+        // neu: Mitglieder
+        protected List<Benutzer> projectMembers = new List<Benutzer>();
+
+        // Modal state (moved from Razor to code-behind)
+        protected int editingProjectId = 0;
+
         [Inject] private AppDbContext Db { get; set; } = default!;
         [CascadingParameter] private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
 
@@ -80,6 +86,8 @@ namespace ProActive2508.Components.Pages.Sabrina
 
                     projektAufgaben = new List<Aufgabe>();
                     aufgabenBenutzerLookup = new Dictionary<int, string>();
+
+                    projectMembers = new List<Benutzer>();
                     return;
                 }
 
@@ -157,6 +165,27 @@ namespace ProActive2508.Components.Pages.Sabrina
                 {
                     aufgabenBenutzerLookup = new Dictionary<int, string>();
                 }
+
+                // --- Mitglieder für dieses Projekt laden ---
+                var memberIds = await Db.ProjektBenutzer
+                    .AsNoTracking()
+                    .Where(pb => pb.ProjektId == project.Id)
+                    .Select(pb => pb.BenutzerId)
+                    .Distinct()
+                    .ToListAsync();
+
+                if (memberIds != null && memberIds.Count > 0)
+                {
+                    projectMembers = await Db.Benutzer
+                        .AsNoTracking()
+                        .Where(b => memberIds.Contains(b.Id))
+                        .OrderBy(b => b.Email)
+                        .ToListAsync();
+                }
+                else
+                {
+                    projectMembers = new List<Benutzer>();
+                }
             }
             catch
             {
@@ -168,6 +197,8 @@ namespace ProActive2508.Components.Pages.Sabrina
 
                 projektAufgaben = new List<Aufgabe>();
                 aufgabenBenutzerLookup = new Dictionary<int, string>();
+
+                projectMembers = new List<Benutzer>();
             }
             finally
             {
@@ -227,6 +258,28 @@ namespace ProActive2508.Components.Pages.Sabrina
         {
             isEditing = false;
             editModel = null;
+        }
+
+        // Modal callbacks moved here so Razor can be code-behind-only
+        protected async Task OnModalSaved()
+        {
+            editingProjectId = 0;
+            // reload details inplace
+            await LoadAsync();
+            StateHasChanged();
+        }
+
+        protected Task OnModalCancelled()
+        {
+            editingProjectId = 0;
+            return Task.CompletedTask;
+        }
+
+        // Open modal for editing
+        protected void OpenEditModal(int projektId)
+        {
+            editingProjectId = projektId;
+            InvokeAsync(StateHasChanged);
         }
     }
 }

@@ -29,6 +29,9 @@ namespace ProActive2508.Components.Pages.Sabrina
         private bool isProjektleiterRole = false;
         private int CurrentUserId;
 
+        // Mitgliederverwaltung
+        private List<int> selectedMemberIds = new();
+
         protected override async Task OnParametersSetAsync()
         {
             await LoadAsync();
@@ -40,6 +43,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             uiError = null;
             editPhaseSelections.Clear();
             allUsers = new();
+            selectedMemberIds = new();
 
             try
             {
@@ -75,7 +79,11 @@ namespace ProActive2508.Components.Pages.Sabrina
                 // users
                 allUsers = await Db.Benutzer.AsNoTracking().OrderBy(b => b.Email).ToListAsync();
 
-                // phases (existing) — use correct property names: ProjektId / PhaseId
+                // load project members
+                var members = await Db.ProjektBenutzer.AsNoTracking().Where(pb => pb.ProjektId == ProjectId).ToListAsync();
+                selectedMemberIds = members.Select(m => m.BenutzerId).ToList();
+
+                // phases (existing) — use correct property names: ProjekteId / PhasenId
                 var existing = await Db.ProjektPhasen
                     .AsNoTracking()
                     .Where(pp => pp.ProjekteId == ProjectId)
@@ -130,6 +138,25 @@ namespace ProActive2508.Components.Pages.Sabrina
             }
         }
 
+        private void ToggleMember(int id, bool isChecked)
+        {
+            if (isChecked)
+            {
+                if (!selectedMemberIds.Contains(id)) selectedMemberIds.Add(id);
+            }
+            else
+            {
+                selectedMemberIds.Remove(id);
+            }
+        }
+
+        private void RemoveMember(int userId)
+        {
+            if (selectedMemberIds != null && selectedMemberIds.Contains(userId))
+            {
+                selectedMemberIds.Remove(userId);
+            }
+        }
         private async Task SaveAsync()
         {
             if (editModel is null) return;
@@ -159,21 +186,29 @@ namespace ProActive2508.Components.Pages.Sabrina
             isSaving = true;
             try
             {
+                // Use explicit transaction to ensure atomic update of project, phases and members
+                await using var tx = await Db.Database.BeginTransactionAsync();
+
                 // Update Projekt safely: avoid duplicate tracked instances
-                var dbProj = await Db.Projekte.FindAsync(editModel.Id);
+                var dbProj = await Db.Projekte.FindAsync(ProjectId);
                 if (dbProj == null)
                 {
                     // Projekt not tracked / not present -> add as new (should not normally happen for edit)
                     Db.Projekte.Add(editModel);
+                    await Db.SaveChangesAsync();
+                    dbProj = editModel; // now has Id
                 }
                 else
                 {
                     // Apply scalar property changes to the tracked entity
                     Db.Entry(dbProj).CurrentValues.SetValues(editModel);
+                    await Db.SaveChangesAsync();
                 }
 
+                int targetProjektId = dbProj.Id;
+
                 // Upsert ProjektPhasen (use ProjekteId / PhaseId)
-                List<ProjektPhase> existing = await Db.ProjektPhasen.Where(pp => pp.ProjekteId == editModel.Id).ToListAsync();
+                List<ProjektPhase> existing = await Db.ProjektPhasen.Where(pp => pp.ProjekteId == targetProjektId).ToListAsync();
                 foreach (var sel in editPhaseSelections)
                 {
                     if (!isProjektleiterRole)
@@ -216,7 +251,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                     {
                         var neu = new ProjektPhase
                         {
-                            ProjekteId = editModel.Id,
+                            ProjekteId = targetProjektId,
                             PhasenId = sel.PhaseId,
                             StartDate = sel.StartDate,
                             DueDate = sel.DueDate,
@@ -228,7 +263,29 @@ namespace ProActive2508.Components.Pages.Sabrina
                     }
                 }
 
+                // Sync ProjektBenutzer (Mitglieder) using targetProjektId
+                var existingMembers = await Db.ProjektBenutzer.Where(pb => pb.ProjektId == targetProjektId).ToListAsync();
+                var existingIds = existingMembers.Select(m => m.BenutzerId).ToList();
+
+                var toAdd = (selectedMemberIds ?? new List<int>()).Except(existingIds).ToList();
+                var toRemove = existingIds.Except((selectedMemberIds ?? new List<int>())).ToList();
+
+                foreach (var uid in toAdd)
+                {
+                    Db.ProjektBenutzer.Add(new ProjektBenutzer { ProjektId = targetProjektId, BenutzerId = uid });
+                }
+
+                if (toRemove.Any())
+                {
+                    var removes = existingMembers.Where(e => toRemove.Contains(e.BenutzerId)).ToList();
+                    Db.ProjektBenutzer.RemoveRange(removes);
+                }
+
+
+
                 await Db.SaveChangesAsync();
+
+                await tx.CommitAsync();
 
                 // fertig: Callback an Parent
                 if (OnSaved.HasDelegate)
