@@ -35,7 +35,7 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var p in projects)
+                @foreach (Projekt p in projects)
                 {
                     <tr>
                         <td>@p.Id</td>
@@ -45,8 +45,8 @@ else
                         </td>
                         <td>
                             @{
-                                var cur = currentPhaseLookup.TryGetValue(p.Id, out var c) ? c : null;
-                                var all = projectPhasesLookup.TryGetValue(p.Id, out var phases) ? phases : new List<ProjektPhase>();
+                                ProjektPhase? cur = currentPhaseLookup.TryGetValue(p.Id, out ProjektPhase? c) ? c : null;
+                                List<ProjektPhase> all = projectPhasesLookup.TryGetValue(p.Id, out List<ProjektPhase>? phases) ? phases : new List<ProjektPhase>();
                             }
                             @if (cur == null)
                             {
@@ -66,20 +66,20 @@ else
                                     }
                                     else
                                     {
-                                        var segWidth = Math.Max(8, 100 / all.Count);    
-                                        foreach (var seg in all)
+                                        int segWidth = Math.Max(8, 100 / all.Count);    
+                                        foreach (ProjektPhase seg in all)
                                         {
-                                            var isCurrent = cur != null && seg.Id == cur.Id;
-                                            var segStyle = $"flex:0 0 {segWidth}%; height:12px; border-radius:4px; background:{(isCurrent ? "#0d6efd" : "#e9ecef")};";
-                                            var segTitle = $"{seg.Phase?.Kurzbezeichnung} {seg.StartDate:dd.MM}→{seg.DueDate:dd.MM}";
+                                            bool isCurrent = cur != null && seg.Id == cur.Id;
+                                            string segStyle = $"flex:0 0 {segWidth}%; height:12px; border-radius:4px; background:{(isCurrent ? "#0d6efd" : "#e9ecef")};";
+                                            string segTitle = $"{seg.Phase?.Kurzbezeichnung} {seg.StartDate:dd.MM}→{seg.DueDate:dd.MM}";
                                             <div style="@segStyle" title="@segTitle"></div>
                                         }
                                     }
                                 </div>
                             }
                         </td>
-                        <td>@(userLookup.TryGetValue(p.ProjektleiterId, out var pl) ? pl : $"Id:{p.ProjektleiterId}")</td>
-                        <td>@(userLookup.TryGetValue(p.AuftraggeberId, out var ag) ? ag : $"Id:{p.AuftraggeberId}")</td>
+                        <td>@(userLookup.TryGetValue(p.ProjektleiterId, out string? pl) ? pl : $"Id:{p.ProjektleiterId}")</td>
+                        <td>@(userLookup.TryGetValue(p.AuftraggeberId, out string? ag) ? ag : $"Id:{p.AuftraggeberId}")</td>
                         <td>
                             @if (CanEdit(p))
                             {

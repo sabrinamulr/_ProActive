@@ -24,7 +24,7 @@ namespace ProActive2508.Service
             if (pm is null) return false;
             if (!string.Equals(pm.Status, "freigegeben", StringComparison.OrdinalIgnoreCase)) return false;
 
-            // Transactional: mark current ProjektPhase as abgeschlossen and (optionally) activate next
+       
             using var tx = await _db.Database.BeginTransactionAsync(ct);
             try
             {
@@ -46,12 +46,25 @@ namespace ProActive2508.Service
 
                 if (next != null)
                 {
-                    // Option: setze keinen magischen Enum‑Wert auf Projekt.Phase, da Enum ggf. nicht 1:1 (siehe Hinweis).
-                    // Stattdessen können wir Next.StartDate/Status belassen; optional setze einen Indikator auf Projekt:
-                    // z.B. Projekt.Phase bleiben unverändert oder erweitern wir später.
+                    // Mark current phase as finished
+                    if (!string.Equals(current.Status, "abgeschlossen", StringComparison.OrdinalIgnoreCase))
+                    {
+                        current.Status = "abgeschlossen";
+                        _db.ProjektPhasen.Update(current);
+                    }
+
+                    // Activate next phase so UI can show it as current
+                    next.Status = "aktiv";
+                    // ensure no Abschlussdatum is set on next
+                    next.Abschlussdatum = null;
+                    _db.ProjektPhasen.Update(next);
+
+                    // Hinweis: Wir setzen hier bewusst nur den Phasen-Status.
+                    // Das Projekt-Objekt (Projekt.Phase) wird nicht automatisch verändert,
+                    // um keine magischen Enum-Zuordnungen vorzunehmen.
                 }
 
-                // optional: Audit (nicht implementiert hier) — du kannst hier eine Audit‑Tabelle füllen
+                
 
                 await _db.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);

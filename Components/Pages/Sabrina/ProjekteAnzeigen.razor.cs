@@ -67,7 +67,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                 }
                 CurrentUserId = parsed;
 
-                // --- Lade Projekte: nur beteiligte Benutzer sehen Projekte (Projektleiter rollen optional: gesamte Übersicht) ---
+                // Lade Projekte: nur beteiligte Benutzer sehen Projekte
                 List<int> memberProjectIds = await Db.ProjektBenutzer
                     .AsNoTracking()
                     .Where(pb => pb.BenutzerId == CurrentUserId)
@@ -89,7 +89,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                         .Where(p => p.ProjektleiterId == CurrentUserId
                                  || p.AuftraggeberId == CurrentUserId
                                  || memberProjectIds.Contains(p.Id))
-                   
+                  
                         .OrderBy(p => p.Id)
                         .ToListAsync();
                 }

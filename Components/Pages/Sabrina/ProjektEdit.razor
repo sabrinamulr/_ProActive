@@ -38,18 +38,28 @@ else
                                 <InputTextArea class="form-control" @bind-Value="editModel.Projektbeschreibung" rows="4" />
                             </div>
 
+                            <div class="mb-3">
+                                <label class="form-label">Status</label>
+                                <InputSelect class="form-select" @bind-Value="editModel.Status">
+                                    @foreach (Projektstatus s in Enum.GetValues(typeof(Projektstatus)))
+                                    {
+                                        <option value="@((int)s)">@s</option>
+                                    }
+                                </InputSelect>
+                            </div>
+
                             <hr />
                             <h6>Mitglieder</h6>
 
                             <div class="mb-3">
-                                <label class="form-label">Auswählen </label>
+                                <label class="form-label">Auswählen (Checkboxen)</label>
                                 <div class="border rounded p-2" style="max-height:220px; overflow:auto;">
                                     @if (allUsers != null && allUsers.Any())
                                     {
-                                        @foreach (var u in allUsers)
+                                        @foreach (Benutzer u in allUsers)
                                         {
                                             <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="mem_@u.Id" checked="@selectedMemberIds.Contains(u.Id)" @onchange="@((ChangeEventArgs e) => ToggleMember(u.Id, (e?.Value as bool?) == true))" />
+                                                <input class="form-check-input" type="checkbox" id="mem_@u.Id" checked="@selectedMemberIds.Contains(u.Id)" @onchange="@((ChangeEventArgs e) => ToggleMember(u.Id, e?.Value is bool b && b))" />
                                                 <label class="form-check-label" for="mem_@u.Id">@u.Email</label>
                                             </div>
                                         }
@@ -59,7 +69,7 @@ else
                                         <div class="text-muted">Keine Benutzer vorhanden.</div>
                                     }
                                 </div>
-                                
+                                <div class="form-text">Wähle mehrere Mitarbeiter über die Checkboxen aus.</div>
                             </div>
 
                             <div class="mb-3">
@@ -72,9 +82,9 @@ else
                                     else
                                     {
                                         <ul class="list-group">
-                                            @foreach (var uid in selectedMemberIds)
+                                            @foreach (int uid in selectedMemberIds)
                                             {
-                                                var usr = allUsers.FirstOrDefault(x => x.Id == uid);
+                                                Benutzer usr = allUsers.FirstOrDefault(x => x.Id == uid);
                                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                                     <div>@(usr?.Email ?? $"Id:{uid}")</div>
                                                     <button class="btn btn-sm btn-outline-danger" type="button" @onclick="@(() => RemoveMember(uid))">Entfernen</button>
@@ -89,7 +99,7 @@ else
                             {
                                 <hr />
                                 <h6>Phasen</h6>
-                                @foreach (var sel in editPhaseSelections)
+                                @foreach (PhaseEditConfig sel in editPhaseSelections)
                                 {
                                     <div class="mb-2">
                                         <div class="fw-semibold">@sel.PhaseKurz</div>
@@ -116,7 +126,7 @@ else
                                                 <label class="form-label">Verantwortlicher</label>
                                                 <InputSelect class="form-select" @bind-Value="sel.VerantwortlicherBenutzerId">
                                                     <option value="0">-- auswählen --</option>
-                                                    @foreach (var u in allUsers)
+                                                    @foreach (Benutzer u in allUsers)
                                                     {
                                                         <option value="@u.Id">@u.Email</option>
                                                     }

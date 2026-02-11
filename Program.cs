@@ -192,7 +192,7 @@ using (var scope = app.Services.CreateScope())
         db.Projekte.AddRange(proj);
         await db.SaveChangesAsync();
 
-        //// ---------- Projekte ----------
+        //// ---------- Projekte ---------- (Projektphasen mit SeedDaten)
         //var proj = new List<Projekt>
         //{
         //    new() { BenutzerId = benutzer[0].Id, ProjektleiterId = benutzer[1].Id, AuftraggeberId = benutzer[2].Id, Status = Projektstatus.Aktiv,         Phase = Projektphase.Umsetzung, Projektbeschreibung="VW" },
