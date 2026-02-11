@@ -124,7 +124,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                 }
 
                 // 1) vorhandene ProjektPhasen laden (zur Upsert-Entscheidung)
-    List<ProjektPhase> existingProjektPhasen = await Db.ProjektPhasen.Where(pp => pp.ProjekteId == ProjectId).ToListAsync();
+                List<ProjektPhase> existingProjektPhasen = await Db.ProjektPhasen.Where(pp => pp.ProjekteId == ProjectId).ToListAsync();
 
                 // 2) Upsert ProjektPhasen
                 foreach (PhaseConfig sel in selections)

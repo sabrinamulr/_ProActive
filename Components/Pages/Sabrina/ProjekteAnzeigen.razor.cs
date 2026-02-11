@@ -78,7 +78,6 @@ namespace ProActive2508.Components.Pages.Sabrina
                 {
                     projects = await Db.Projekte
                         .AsNoTracking()
-                        
                         .OrderBy(p => p.Id)
                         .ToListAsync();
                 }
@@ -89,7 +88,6 @@ namespace ProActive2508.Components.Pages.Sabrina
                         .Where(p => p.ProjektleiterId == CurrentUserId
                                  || p.AuftraggeberId == CurrentUserId
                                  || memberProjectIds.Contains(p.Id))
-                  
                         .OrderBy(p => p.Id)
                         .ToListAsync();
                 }
@@ -104,10 +102,12 @@ namespace ProActive2508.Components.Pages.Sabrina
 
                     if (userIds.Any())
                     {
-                        userLookup = await Db.Benutzer
+                        Dictionary<int, string> lookup = await Db.Benutzer
                             .AsNoTracking()
                             .Where(b => userIds.Contains(b.Id))
                             .ToDictionaryAsync(b => b.Id, b => string.IsNullOrWhiteSpace(b.Email) ? $"User#{b.Id}" : b.Email);
+
+                        userLookup = lookup;
                     }
                 }
                 else
@@ -185,7 +185,6 @@ namespace ProActive2508.Components.Pages.Sabrina
             await Task.CompletedTask;
         }
 
-        // Callback: Modal abgebrochen → nur schließen
         protected Task ModalCancelled()
         {
             editingProjectId = 0;

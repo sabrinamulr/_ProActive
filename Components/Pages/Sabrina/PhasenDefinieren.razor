@@ -30,9 +30,9 @@ else
         <DataAnnotationsValidator />
 
         <div class="mb-3">
-            <label class="form-label">Phasen (feste Reihenfolge, nur Datum / Ampel / Notizen / Meilenstein editierbar)</label>
+            <label class="form-label">Phasen</label>
             <div class="list-group">
-                @foreach (PhaseConfig sel in selections)
+                @foreach (PhasenDefinieren.PhaseConfig sel in selections)
                 {
                     <div class="list-group-item">
                         <div class="row g-2 align-items-center">

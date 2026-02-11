@@ -59,6 +59,7 @@ else
                                     <div class="small text-muted">@($"{cur.StartDate:dd.MM.yyyy} – {cur.DueDate:dd.MM.yyyy}")</div>
                                 </div>
 
+                                //Darstellung aller Phasen als Timeline, aktuelle Phase farblich hervorheben (= richtige Darstellung)
                                 <div class="timeline d-flex" style="gap:6px;">
                                     @if (all == null || !all.Any())
                                     {
@@ -79,7 +80,7 @@ else
                             }
                         </td>
                         <td>@(userLookup.TryGetValue(p.ProjektleiterId, out string? pl) ? pl : $"Id:{p.ProjektleiterId}")</td>
-                        <td>@(userLookup.TryGetValue(p.AuftraggeberId, out string? ag) ? ag : $"Id:{p.AuftraggeberId}")</td>
+                        @*<td>@(userLookup.TryGetValue(p.AuftraggeberId, out string? ag) ? ag : $"Id:{p.AuftraggeberId}")</td>*@
                         <td>
                             @if (CanEdit(p))
                             {

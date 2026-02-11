@@ -40,10 +40,10 @@ else
 
                             <div class="mb-3">
                                 <label class="form-label">Status</label>
-                                <InputSelect class="form-select" @bind-Value="editModel.Status">
+                                <InputSelect class="form-select" TValue="Projektstatus" @bind-Value="editModel.Status">
                                     @foreach (Projektstatus s in Enum.GetValues(typeof(Projektstatus)))
                                     {
-                                        <option value="@((int)s)">@s</option>
+                                        <option value="@s">@s</option>
                                     }
                                 </InputSelect>
                             </div>

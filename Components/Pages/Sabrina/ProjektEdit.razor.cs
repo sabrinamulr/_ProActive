@@ -50,8 +50,8 @@ namespace ProActive2508.Components.Pages.Sabrina
                 if (ProjectId <= 0) return;
 
                 // Auth / current user
-                var auth = await Auth.GetAuthenticationStateAsync();
-                var user = auth.User;
+                AuthenticationState auth = await Auth.GetAuthenticationStateAsync();
+                System.Security.Claims.ClaimsPrincipal user = auth.User;
                 isProjektleiterRole = user.IsInRole("Projektleiter");
                 string? idClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                                   ?? user.FindFirst("sub")?.Value;
@@ -61,30 +61,32 @@ namespace ProActive2508.Components.Pages.Sabrina
                     string? name = user.Identity?.Name ?? string.Empty;
                     if (!string.IsNullOrWhiteSpace(name) && int.TryParse(name, out int pn))
                     {
-                        var dbUser = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == pn);
+                        Benutzer? dbUser = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == pn);
                         parsed = dbUser?.Id ?? 0;
                     }
                     else
                     {
-                        var dbUserByMail = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
+                        Benutzer? dbUserByMail = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
                         parsed = dbUserByMail?.Id ?? 0;
                     }
                 }
                 CurrentUserId = parsed;
 
                 // load project
-                editModel = await Db.Projekte.AsNoTracking().FirstOrDefaultAsync(p => p.Id == ProjectId);
+                Projekt? proj = await Db.Projekte.AsNoTracking().FirstOrDefaultAsync(p => p.Id == ProjectId);
+                editModel = proj;
                 if (editModel == null) { uiError = "Projekt nicht gefunden."; return; }
 
                 // users
-                allUsers = await Db.Benutzer.AsNoTracking().OrderBy(b => b.Email).ToListAsync();
+                List<Benutzer> users = await Db.Benutzer.AsNoTracking().OrderBy(b => b.Email).ToListAsync();
+                allUsers = users;
 
                 // load project members
-                var members = await Db.ProjektBenutzer.AsNoTracking().Where(pb => pb.ProjektId == ProjectId).ToListAsync();
+                List<ProjektBenutzer> members = await Db.ProjektBenutzer.AsNoTracking().Where(pb => pb.ProjektId == ProjectId).ToListAsync();
                 selectedMemberIds = members.Select(m => m.BenutzerId).ToList();
 
                 // phases (existing) — use correct property names: ProjekteId / PhasenId
-                var existing = await Db.ProjektPhasen
+                List<ProjektPhase> existing = await Db.ProjektPhasen
                     .AsNoTracking()
                     .Where(pp => pp.ProjekteId == ProjectId)
                     .Include(pp => pp.Phase)
@@ -93,7 +95,7 @@ namespace ProActive2508.Components.Pages.Sabrina
 
                 if (!existing.Any())
                 {
-                    var first = await Db.Phasen.AsNoTracking().OrderBy(p => p.Id).FirstOrDefaultAsync();
+                    Phase? first = await Db.Phasen.AsNoTracking().OrderBy(p => p.Id).FirstOrDefaultAsync();
                     if (first != null)
                     {
                         editPhaseSelections = new List<PhaseEditConfig>
@@ -169,7 +171,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             }
 
             // validation
-            foreach (var cfg in editPhaseSelections)
+            foreach (PhaseEditConfig cfg in editPhaseSelections)
             {
                 if (cfg.StartDate.Date > cfg.DueDate.Date)
                 {
@@ -187,105 +189,107 @@ namespace ProActive2508.Components.Pages.Sabrina
             try
             {
                 // Use explicit transaction to ensure atomic update of project, phases and members
-                await using var tx = await Db.Database.BeginTransactionAsync();
-
-                // Update Projekt safely: avoid duplicate tracked instances
-                var dbProj = await Db.Projekte.FindAsync(ProjectId);
-                if (dbProj == null)
+                Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction tx = await Db.Database.BeginTransactionAsync();
+                await using (tx)
                 {
-                    // Projekt not tracked / not present -> add as new (should not normally happen for edit)
-                    Db.Projekte.Add(editModel);
-                    await Db.SaveChangesAsync();
-                    dbProj = editModel; // now has Id
-                }
-                else
-                {
-                    // Apply scalar property changes to the tracked entity
-                    Db.Entry(dbProj).CurrentValues.SetValues(editModel);
-                    await Db.SaveChangesAsync();
-                }
-
-                int targetProjektId = dbProj.Id;
-
-                // Upsert ProjektPhasen (use ProjekteId / PhaseId)
-                List<ProjektPhase> existing = await Db.ProjektPhasen.Where(pp => pp.ProjekteId == targetProjektId).ToListAsync();
-                foreach (var sel in editPhaseSelections)
-                {
-                    if (!isProjektleiterRole)
+                    // Update Projekt safely: avoid duplicate tracked instances
+                    Projekt? dbProj = await Db.Projekte.FindAsync(ProjectId);
+                    if (dbProj == null)
                     {
+                        // Projekt not tracked / not present -> add as new (should not normally happen for edit)
+                        Db.Projekte.Add(editModel);
+                        await Db.SaveChangesAsync();
+                        dbProj = editModel; // now has Id
+                    }
+                    else
+                    {
+                        // Apply scalar property changes to the tracked entity
+                        Db.Entry(dbProj).CurrentValues.SetValues(editModel);
+                        await Db.SaveChangesAsync();
+                    }
+
+                    int targetProjektId = dbProj.Id;
+
+                    // Upsert ProjektPhasen (use ProjekteId / PhaseId)
+                    List<ProjektPhase> existing = await Db.ProjektPhasen.Where(pp => pp.ProjekteId == targetProjektId).ToListAsync();
+                    foreach (PhaseEditConfig sel in editPhaseSelections)
+                    {
+                        if (!isProjektleiterRole)
+                        {
+                            if (sel.ExistingId != 0)
+                            {
+                                ProjektPhase? dbPhase = existing.FirstOrDefault(e => e.Id == sel.ExistingId);
+                                if (dbPhase == null || dbPhase.VerantwortlicherbenutzerId != CurrentUserId)
+                                {
+                                    uiError = $"Keine Berechtigung, Phase '{sel.PhaseKurz}' zu ändern.";
+                                    isSaving = false;
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                if (sel.VerantwortlicherBenutzerId != CurrentUserId && editModel.ProjektleiterId != CurrentUserId)
+                                {
+                                    uiError = $"Keine Berechtigung, neue Phase '{sel.PhaseKurz}' anzulegen.";
+                                    isSaving = false;
+                                    return;
+                                }
+                            }
+                        }
+
                         if (sel.ExistingId != 0)
                         {
-                            var dbPhase = existing.FirstOrDefault(e => e.Id == sel.ExistingId);
-                            if (dbPhase == null || dbPhase.VerantwortlicherbenutzerId != CurrentUserId)
+                            ProjektPhase? upd = existing.FirstOrDefault(e => e.Id == sel.ExistingId);
+                            if (upd != null)
                             {
-                                uiError = $"Keine Berechtigung, Phase '{sel.PhaseKurz}' zu ändern.";
-                                isSaving = false;
-                                return;
+                                upd.StartDate = sel.StartDate;
+                                upd.DueDate = sel.DueDate;
+                                upd.VerantwortlicherbenutzerId = sel.VerantwortlicherBenutzerId;
+                                upd.Notizen = sel.Notizen;
+                                upd.Status = sel.Status;
+                                Db.ProjektPhasen.Update(upd);
                             }
                         }
                         else
                         {
-                            if (sel.VerantwortlicherBenutzerId != CurrentUserId && editModel.ProjektleiterId != CurrentUserId)
+                            ProjektPhase neu = new ProjektPhase
                             {
-                                uiError = $"Keine Berechtigung, neue Phase '{sel.PhaseKurz}' anzulegen.";
-                                isSaving = false;
-                                return;
-                            }
+                                ProjekteId = targetProjektId,
+                                PhasenId = sel.PhaseId,
+                                StartDate = sel.StartDate,
+                                DueDate = sel.DueDate,
+                                VerantwortlicherbenutzerId = sel.VerantwortlicherBenutzerId,
+                                Status = sel.Status,
+                                Notizen = sel.Notizen
+                            };
+                            Db.ProjektPhasen.Add(neu);
                         }
                     }
 
-                    if (sel.ExistingId != 0)
+                    // Sync ProjektBenutzer (Mitglieder) using targetProjektId
+                    List<ProjektBenutzer> existingMembers = await Db.ProjektBenutzer.Where(pb => pb.ProjektId == targetProjektId).ToListAsync();
+                    List<int> existingIds = existingMembers.Select(m => m.BenutzerId).ToList();
+
+                    List<int> toAdd = (selectedMemberIds ?? new List<int>()).Except(existingIds).ToList();
+                    List<int> toRemove = existingIds.Except((selectedMemberIds ?? new List<int>())).ToList();
+
+                    foreach (int uid in toAdd)
                     {
-                        var upd = existing.FirstOrDefault(e => e.Id == sel.ExistingId);
-                        if (upd != null)
-                        {
-                            upd.StartDate = sel.StartDate;
-                            upd.DueDate = sel.DueDate;
-                            upd.VerantwortlicherbenutzerId = sel.VerantwortlicherBenutzerId;
-                            upd.Notizen = sel.Notizen;
-                            upd.Status = sel.Status;
-                            Db.ProjektPhasen.Update(upd);
-                        }
+                        Db.ProjektBenutzer.Add(new ProjektBenutzer { ProjektId = targetProjektId, BenutzerId = uid });
                     }
-                    else
+
+                    if (toRemove.Any())
                     {
-                        var neu = new ProjektPhase
-                        {
-                            ProjekteId = targetProjektId,
-                            PhasenId = sel.PhaseId,
-                            StartDate = sel.StartDate,
-                            DueDate = sel.DueDate,
-                            VerantwortlicherbenutzerId = sel.VerantwortlicherBenutzerId,
-                            Status = sel.Status,
-                            Notizen = sel.Notizen
-                        };
-                        Db.ProjektPhasen.Add(neu);
+                        List<ProjektBenutzer> removes = existingMembers.Where(e => toRemove.Contains(e.BenutzerId)).ToList();
+                        Db.ProjektBenutzer.RemoveRange(removes);
                     }
+
+
+
+                    await Db.SaveChangesAsync();
+
+                    await tx.CommitAsync();
                 }
-
-                // Sync ProjektBenutzer (Mitglieder) using targetProjektId
-                var existingMembers = await Db.ProjektBenutzer.Where(pb => pb.ProjektId == targetProjektId).ToListAsync();
-                var existingIds = existingMembers.Select(m => m.BenutzerId).ToList();
-
-                var toAdd = (selectedMemberIds ?? new List<int>()).Except(existingIds).ToList();
-                var toRemove = existingIds.Except((selectedMemberIds ?? new List<int>())).ToList();
-
-                foreach (var uid in toAdd)
-                {
-                    Db.ProjektBenutzer.Add(new ProjektBenutzer { ProjektId = targetProjektId, BenutzerId = uid });
-                }
-
-                if (toRemove.Any())
-                {
-                    var removes = existingMembers.Where(e => toRemove.Contains(e.BenutzerId)).ToList();
-                    Db.ProjektBenutzer.RemoveRange(removes);
-                }
-
-
-
-                await Db.SaveChangesAsync();
-
-                await tx.CommitAsync();
 
                 // fertig: Callback an Parent
                 if (OnSaved.HasDelegate)
