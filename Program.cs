@@ -289,6 +289,14 @@ using (IServiceScope scope = app.Services.CreateScope())
         await db.SaveChangesAsync();
     }
     List<Antwort> antworten = new List<Antwort>();
+    int benutzerIdProjekt2 = await db.Projekte
+        .Where(p => p.Id == 2)
+        .Select(p => p.BenutzerId)
+        .FirstOrDefaultAsync();
+    int benutzerIdProjekt4 = await db.Projekte
+        .Where(p => p.Id == 4)
+        .Select(p => p.BenutzerId)
+        .FirstOrDefaultAsync();
 
     // Projekt 2 – positive
     for (int frageId = 1; frageId <= 20; frageId++)
@@ -298,7 +306,8 @@ using (IServiceScope scope = app.Services.CreateScope())
             ProjektId = 2,
             FrageId = frageId,
             Rating = Random.Shared.Next(4, 6), // 4–5
-            Datum = DateTime.Now.AddDays(-30)
+            Datum = DateTime.Now.AddDays(-30),
+            BenutzerId = benutzerIdProjekt2
         });
     }
 
@@ -322,7 +331,8 @@ using (IServiceScope scope = app.Services.CreateScope())
             ProjektId = 4,
             FrageId = frageId,
             Rating = Random.Shared.Next(1, 4), // 1–3
-            Datum = DateTime.Now.AddDays(-10)
+            Datum = DateTime.Now.AddDays(-10),
+            BenutzerId = benutzerIdProjekt4
         });
     }
 

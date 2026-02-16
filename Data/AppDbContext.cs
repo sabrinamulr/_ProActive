@@ -331,6 +331,7 @@ namespace ProActive2508.Data
                 a.ToTable("Antwort");
                 a.Property(x => x.Id).ValueGeneratedOnAdd();
                 a.Property(x => x.Datum).HasColumnType("datetime2");
+                a.Property(x => x.BenutzerId).IsRequired();
 
                 a.HasOne(x => x.Frage)
                     .WithMany(f => f.Antworten)
@@ -342,8 +343,14 @@ namespace ProActive2508.Data
                     .HasForeignKey(x => x.ProjektId)
                     .OnDelete(DeleteBehavior.Restrict);
 
+                a.HasOne(x => x.Benutzer)
+                    .WithMany(b => b.Antworten)
+                    .HasForeignKey(x => x.BenutzerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
                 a.HasIndex(x => x.FrageId);
                 a.HasIndex(x => x.ProjektId);
+                a.HasIndex(x => x.BenutzerId);
             });
 
 

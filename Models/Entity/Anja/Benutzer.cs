@@ -33,6 +33,10 @@ namespace ProActive2508.Models.Entity.Anja
         [InverseProperty(nameof(Aufgabe.Benutzer))]
         public ICollection<Aufgabe> Aufgaben { get; set; } = new List<Aufgabe>();
 
+        // 1:n Benutzer -> Antworten
+        [InverseProperty(nameof(Antwort.Benutzer))]
+        public ICollection<Antwort> Antworten { get; set; } = new List<Antwort>();
+
         // Mehrere Beziehungen Benutzer <-> Projekt müssen eindeutig benannt werden:
         [InverseProperty(nameof(Projekt.Owner))]
         public ICollection<Projekt> ProjekteAlsOwner { get; set; } = new List<Projekt>();

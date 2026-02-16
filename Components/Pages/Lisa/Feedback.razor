@@ -6,9 +6,11 @@
 @using ProActive2508.Service
 @using ProActive2508.Data
 @using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
 @inject Umfrage FeedbackService
 @inject AppDbContext _context
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
 
 
 <h2>Projektfeedback</h2>
@@ -96,12 +98,29 @@
     private Dictionary<int, int> Antworten = new();
     private int AktuelleKategorieIndex = 0;
     private bool IsSubmitted = false;
+    private int CurrentUserId = 0;
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (!user.Identity?.IsAuthenticated ?? true)
+        {
+            StatusMessage = "Nicht angemeldet. Bitte erneut anmelden.";
+            return;
+        }
+
+        CurrentUserId = GetUserIdFromClaims(user);
+        if (CurrentUserId <= 0)
+        {
+            StatusMessage = "Kein gültiger Benutzer gefunden. Bitte neu anmelden.";
+            return;
+        }
+
         // Prüfen, ob dieses Projekt schon Feedback abgegeben hat
         bool hatFeedback = await _context.Antworten
-            .AnyAsync(f => f.ProjektId == ProjektId);
+            .AnyAsync(f => f.ProjektId == ProjektId && f.BenutzerId == CurrentUserId);
 
         if (hatFeedback)
         {
@@ -152,6 +171,13 @@
             if (IsSubmitted)
                 return;
 
+            if (CurrentUserId <= 0)
+            {
+                StatusMessage = "Kein gültiger Benutzer gefunden. Bitte neu anmelden.";
+                IsSubmitted = false;
+                return;
+            }
+
             IsSubmitted = true;
 
             foreach (var kvp in Antworten)
@@ -161,6 +187,7 @@
                     FrageId = kvp.Key,
                     Rating = kvp.Value,
                     ProjektId = ProjektId,
+                    BenutzerId = CurrentUserId,
                     Datum = DateTime.Now
                 };
 
@@ -175,5 +202,16 @@
             StatusMessage = "Fehler beim Speichern: " + ex.Message;
             IsSubmitted = false;
         }
+    }
+
+    private int GetUserIdFromClaims(ClaimsPrincipal user)
+    {
+        string idStr =
+            user.FindFirstValue(ClaimTypes.NameIdentifier) ??
+            user.FindFirstValue("sub") ??
+            user.FindFirstValue("user_id") ??
+            "0";
+
+        return int.TryParse(idStr, out int id) ? id : 0;
     }
 }

@@ -18,6 +18,9 @@ namespace ProActive2508.Models.Entity.Anja
         [Required]
         public int ProjektId { get; set; }
 
+        [Required]
+        public int BenutzerId { get; set; }
+
         public int Rating { get; set; }
 
         [DataType(DataType.Date)]
@@ -31,5 +34,9 @@ namespace ProActive2508.Models.Entity.Anja
         [ForeignKey(nameof(ProjektId))]
         [InverseProperty(nameof(Projekt.Antworten))]
         public Projekt? Projekt { get; set; }
+
+        [ForeignKey(nameof(BenutzerId))]
+        [InverseProperty(nameof(Benutzer.Antworten))]
+        public Benutzer? Benutzer { get; set; }
     }
 }
