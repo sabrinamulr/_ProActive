@@ -20,7 +20,7 @@ using System.Security.Claims;
 
 
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -76,7 +76,7 @@ builder.Services.AddSession(options =>
 
 });
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
 {
@@ -102,7 +102,7 @@ app.UseAntiforgery();
 // dann sofort abmelden und auf Login umleiten.
 app.Use(async (ctx, next) =>
 {
-    var path = ctx.Request.Path.Value?.ToLowerInvariant() ?? "";
+    string path = ctx.Request.Path.Value?.ToLowerInvariant() ?? "";
 
     // Unkritische Pfade durchlassen (statische Dateien, Framework, Login, Logout etc.)
     if (path.StartsWith("/_framework")
@@ -122,7 +122,7 @@ app.Use(async (ctx, next) =>
 
     if (ctx.User?.Identity?.IsAuthenticated == true)
     {
-        var sessionFlag = ctx.Session.GetString("SessionAlive");
+        string? sessionFlag = ctx.Session.GetString("SessionAlive");
         if (string.IsNullOrEmpty(sessionFlag))
         {
             // Keine aktive Session (z.B. nach Browser/Tab-Schließen) → erzwinge Logout
@@ -136,18 +136,18 @@ app.Use(async (ctx, next) =>
 });
 
 // ======== DB MIGRATE & RUNTIME-SEED ========
-using (var scope = app.Services.CreateScope())
+using (IServiceScope scope = app.Services.CreateScope())
 {
-    var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
-    await using var db = await dbFactory.CreateDbContextAsync();
-    var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<Benutzer>>();
+    IDbContextFactory<AppDbContext> dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+    await using AppDbContext db = await dbFactory.CreateDbContextAsync();
+    IPasswordHasher<Benutzer> hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<Benutzer>>();
 
     await db.Database.MigrateAsync();
 
     // ---------- Benutzer ----------
     if (!await db.Benutzer.AnyAsync())
     {
-        var benutzer = new List<Benutzer>
+        List<Benutzer> benutzer = new List<Benutzer>
         {
             new() { Personalnummer = 1001, Email = "anna@example.com", Stufe = "Mitarbeiter",   Abteilung = "IT",      Verfuegbarkeit = 1, PasswordHash = "" },
             new() { Personalnummer = 1002, Email = "ben@example.com",  Stufe = "Projektleiter", Abteilung = "HR",      Verfuegbarkeit = 2, PasswordHash = "" },
@@ -155,7 +155,7 @@ using (var scope = app.Services.CreateScope())
             new() { Personalnummer = 1004, Email = "dave@example.com", Stufe = "Projektleiter", Abteilung = "Finance", Verfuegbarkeit = 2, PasswordHash = "" },
             new() { Personalnummer = 1005, Email = "eva@example.com",  Stufe = "Koch",          Abteilung = "Küche",   Verfuegbarkeit = 1, PasswordHash = "" }
         };
-        foreach (var u in benutzer)
+        foreach (Benutzer u in benutzer)
             u.PasswordHash = hasher.HashPassword(u, "Passw0rd!123.");
         db.Benutzer.AddRange(benutzer);
         await db.SaveChangesAsync();
@@ -172,15 +172,15 @@ using (var scope = app.Services.CreateScope())
         int? phaseP8Id = 9;
 
         // Kurze Validierung: prüfen, ob die erwarteten Seed‑Phasen in der DB vorhanden sind
-        var expectedIds = new[] {
+        int[] expectedIds = new[] {
                     phaseP0Id.Value, phaseP1Id.Value, phaseP2Id.Value, phaseP3Id.Value, phaseP4Id.Value,
                     phaseP5Id.Value, phaseP6Id.Value, phaseP7Id.Value, phaseP8Id.Value
                 };
-        var presentCount = await db.Phasen.CountAsync(p => expectedIds.Contains(p.Id));
+        int presentCount = await db.Phasen.CountAsync(p => expectedIds.Contains(p.Id));
         if (presentCount < expectedIds.Length)
             throw new InvalidOperationException("Seed-Phasen fehlen in der Datenbank. Migration/Seed prüfen.");
 
-        var proj = new List<Projekt>
+        List<Projekt> proj = new List<Projekt>
                 {
                     new() { BenutzerId = benutzer[0].Id, ProjektleiterId = benutzer[1].Id, AuftraggeberId = benutzer[2].Id, Status = Projektstatus.Aktiv,         Phase = phaseP2Id ?? 0, Projektbeschreibung="VW" },
                     new() { BenutzerId = benutzer[1].Id, ProjektleiterId = benutzer[2].Id, AuftraggeberId = benutzer[3].Id, Status = Projektstatus.Pausiert,      Phase = phaseP5Id ?? 0, Projektbeschreibung="Mazda" },
@@ -192,8 +192,8 @@ using (var scope = app.Services.CreateScope())
         db.Projekte.AddRange(proj);
         await db.SaveChangesAsync();
 
-        //// ---------- Projekte ---------- (Projektphasen mit SeedDaten)
-        //var proj = new List<Projekt>
+        //// ---------- Projekte ----------
+        //List<Projekt> proj = new List<Projekt>
         //{
         //    new() { BenutzerId = benutzer[0].Id, ProjektleiterId = benutzer[1].Id, AuftraggeberId = benutzer[2].Id, Status = Projektstatus.Aktiv,         Phase = Projektphase.Umsetzung, Projektbeschreibung="VW" },
         //    new() { BenutzerId = benutzer[1].Id, ProjektleiterId = benutzer[2].Id, AuftraggeberId = benutzer[3].Id, Status = Projektstatus.Pausiert,      Phase = Projektphase.Planung , Projektbeschreibung="Mazda" },
@@ -208,7 +208,7 @@ using (var scope = app.Services.CreateScope())
 
         // ---------- Aufgaben ----------
         const int offen = 0, bearbeitung = 1, erledigt = 2;
-        var aufgaben = new List<Aufgabe>
+        List<Aufgabe> aufgaben = new List<Aufgabe>
         {
             new() { ProjektId = proj[0].Id, BenutzerId = benutzer[0].Id, Aufgabenbeschreibung = "Kickoff vorbereiten",   Faellig = new DateTime(2025, 9, 1), Phase = offen,          Erledigt = Erledigungsstatus.Offen,    ErstellVon = benutzer[1].Id },
             new() { ProjektId = proj[1].Id, BenutzerId = benutzer[1].Id, Aufgabenbeschreibung = "Anforderungen sammeln", Faellig = new DateTime(2025, 9, 2), Phase = offen,          Erledigt = Erledigungsstatus.Offen,    ErstellVon = proj[1].ProjektleiterId },
@@ -222,7 +222,7 @@ using (var scope = app.Services.CreateScope())
     // ---------- Feedback-Kategorien & Fragen ----------
     if (!await db.UmfrageKategorien.AnyAsync())
     {
-        var kategorien = new List<UmfrageKategorie>
+        List<UmfrageKategorie> kategorien = new List<UmfrageKategorie>
     {
         new UmfrageKategorie
         {
@@ -288,7 +288,7 @@ using (var scope = app.Services.CreateScope())
         db.UmfrageKategorien.AddRange(kategorien);
         await db.SaveChangesAsync();
     }
-    var antworten = new List<Antwort>();
+    List<Antwort> antworten = new List<Antwort>();
 
     // Projekt 2 – positive
     for (int frageId = 1; frageId <= 20; frageId++)
@@ -359,7 +359,7 @@ using (var scope = app.Services.CreateScope())
     // ---------- Preisverlauf ----------
     if (!await db.Preisverlaeufe.AnyAsync())
     {
-        var gerichtByName = await db.Gerichte.ToDictionaryAsync(g => g.Gerichtname, g => g.Id);
+        Dictionary<string, int> gerichtByName = await db.Gerichte.ToDictionaryAsync(g => g.Gerichtname, g => g.Id);
         db.Preisverlaeufe.AddRange(
             new Preisverlauf { GerichtId = gerichtByName["Spaghetti Bolognese"], Preis = 8.50m, GueltigAb = new DateTime(2025, 9, 1) },
             new Preisverlauf { GerichtId = gerichtByName["Hühnchen Curry"], Preis = 9.20m, GueltigAb = new DateTime(2025, 9, 1) },
@@ -373,8 +373,8 @@ using (var scope = app.Services.CreateScope())
     // ---------- GerichtAllergen ----------
     if (!await db.GerichtAllergene.AnyAsync())
     {
-        var allergenByKey = await db.Allergene.ToDictionaryAsync(a => a.Kuerzel, a => a.Id);
-        var gerichtByName = await db.Gerichte.ToDictionaryAsync(g => g.Gerichtname, g => g.Id);
+        Dictionary<string, int> allergenByKey = await db.Allergene.ToDictionaryAsync(a => a.Kuerzel, a => a.Id);
+        Dictionary<string, int> gerichtByName = await db.Gerichte.ToDictionaryAsync(g => g.Gerichtname, g => g.Id);
 
         db.GerichtAllergene.AddRange(
             new GerichtAllergen { GerichtId = gerichtByName["Spaghetti Bolognese"], AllergenId = allergenByKey["A"] },
@@ -406,8 +406,8 @@ using (var scope = app.Services.CreateScope())
     // ---------- Menueplan ----------
     if (!await db.Menueplaene.AnyAsync())
     {
-        var tagByDate = await db.MenueplanTage.ToDictionaryAsync(t => t.Tag.Date, t => t.Id);
-        var gerichtByName = await db.Gerichte.ToDictionaryAsync(g => g.Gerichtname, g => g.Id);
+        Dictionary<DateTime, int> tagByDate = await db.MenueplanTage.ToDictionaryAsync(t => t.Tag.Date, t => t.Id);
+        Dictionary<string, int> gerichtByName = await db.Gerichte.ToDictionaryAsync(g => g.Gerichtname, g => g.Id);
 
         // ✅ Diese Woche: Montag–Freitag → JEDER Tag hat 2 Menüs (PositionNr 1 & 2)
         db.Menueplaene.AddRange(
@@ -438,9 +438,9 @@ using (var scope = app.Services.CreateScope())
     // ---------- Vorbestellungen ----------
     if (!await db.Vorbestellungen.AnyAsync())
     {
-        var benutzerByPn = await db.Benutzer.ToDictionaryAsync(b => b.Personalnummer, b => b.Id);
-        var tagByDate = await db.MenueplanTage.ToDictionaryAsync(t => t.Tag.Date, t => t.Id);
-        var entries = await db.Menueplaene.ToListAsync();
+        Dictionary<int, int> benutzerByPn = await db.Benutzer.ToDictionaryAsync(b => b.Personalnummer, b => b.Id);
+        Dictionary<DateTime, int> tagByDate = await db.MenueplanTage.ToDictionaryAsync(t => t.Tag.Date, t => t.Id);
+        List<Menueplan> entries = await db.Menueplaene.ToListAsync();
 
         int EintragIdFor(DateTime date, int pos)
             => entries.First(e => e.MenueplanTagId == tagByDate[date.Date] && e.PositionNr == pos).Id;
@@ -468,21 +468,21 @@ app.MapPost("/auth/login", async (
     {
         await antiforgery.ValidateRequestAsync(http); // CSRF-Check
 
-        var user = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == input.Personalnummer);
-        var pwd = (input.Password ?? string.Empty).Trim();
+        Benutzer? user = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == input.Personalnummer);
+        string pwd = (input.Password ?? string.Empty).Trim();
         if (user is null || string.IsNullOrWhiteSpace(user.PasswordHash)) return Results.Redirect("/auth/login?err=1");
 
-        var verify = hasher.VerifyHashedPassword(user, user.PasswordHash, pwd);
+        PasswordVerificationResult verify = hasher.VerifyHashedPassword(user, user.PasswordHash, pwd);
         if (verify == PasswordVerificationResult.Failed) return Results.Redirect("/auth/login?err=1");
 
         if (verify == PasswordVerificationResult.SuccessRehashNeeded)
         {
-            var tracked = await db.Benutzer.FirstAsync(b => b.Id == user.Id);
+            Benutzer tracked = await db.Benutzer.FirstAsync(b => b.Id == user.Id);
             tracked.PasswordHash = hasher.HashPassword(tracked, pwd);
             await db.SaveChangesAsync();
         }
 
-        var claims = new List<Claim>
+        List<Claim> claims = new List<Claim>
         {
         new(ClaimTypes.NameIdentifier, user.Id.ToString()),
         new(ClaimTypes.Name, string.IsNullOrWhiteSpace(user.Email) ? user.Personalnummer.ToString() : user.Email),
@@ -491,19 +491,19 @@ app.MapPost("/auth/login", async (
 
         if (!string.IsNullOrWhiteSpace(user.Stufe))
         {
-            var roles = user.Stufe.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            IEnumerable<string> roles = user.Stufe.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                                   .Where(r => !string.IsNullOrWhiteSpace(r))
                                   .Distinct(StringComparer.OrdinalIgnoreCase);
-            foreach (var role in roles) claims.Add(new Claim(ClaimTypes.Role, role));
+            foreach (string role in roles) claims.Add(new Claim(ClaimTypes.Role, role));
         }
 
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name, ClaimTypes.Role);
-        var principal = new ClaimsPrincipal(identity);
+        ClaimsIdentity identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name, ClaimTypes.Role);
+        ClaimsPrincipal principal = new ClaimsPrincipal(identity);
 
         // Altes Cookie weg
         await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
-        var props = new AuthenticationProperties(); // NICHT persistent → Session-Cookie
+        AuthenticationProperties props = new AuthenticationProperties(); // NICHT persistent → Session-Cookie
         await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, props);
 
         // ⬅️ WICHTIG: Session-Flag setzen → markiert laufende Browsersitzung
@@ -517,41 +517,41 @@ app.MapPost("/auth/login", async (
         await antiforgery.ValidateRequestAsync(http);
         if (http.User?.Identity?.IsAuthenticated != true) return Results.Redirect("/changepassword?err=auth");
 
-        var form = await http.Request.ReadFormAsync();
-        var curr = form["AktuellesPasswort"].ToString();
-        var neu = form["NeuesPasswort"].ToString();
-        var neu2 = form["NeuesPasswortBestaetigt"].ToString();
+        IFormCollection form = await http.Request.ReadFormAsync();
+        string curr = form["AktuellesPasswort"].ToString();
+        string neu = form["NeuesPasswort"].ToString();
+        string neu2 = form["NeuesPasswortBestaetigt"].ToString();
 
         if (string.IsNullOrWhiteSpace(curr) || string.IsNullOrWhiteSpace(neu) || string.IsNullOrWhiteSpace(neu2)) return Results.Redirect("/auth/changepassword?err=unk");
         if (neu != neu2) return Results.Redirect("/auth/changepassword?err=cmp");
         if (neu.Length < 8) return Results.Redirect("/auth/changepassword?err=unk");
 
         int? currentUserId = null;
-        var idStr = http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? http.User.FindFirst("sub")?.Value;
-        if (int.TryParse(idStr, out var idFromClaim)) currentUserId = idFromClaim;
+        string? idStr = http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? http.User.FindFirst("sub")?.Value;
+        if (int.TryParse(idStr, out int idFromClaim)) currentUserId = idFromClaim;
         else
         {
-            var name = http.User.Identity?.Name;
+            string? name = http.User.Identity?.Name;
             if (!string.IsNullOrWhiteSpace(name))
             {
-                if (int.TryParse(name, out var personalnummer))
+                if (int.TryParse(name, out int personalnummer))
                 {
-                    var dbUserByPn = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == personalnummer);
+                    Benutzer? dbUserByPn = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == personalnummer);
                     currentUserId = dbUserByPn?.Id;
                 }
                 else
                 {
-                    var dbUserByMail = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
+                    Benutzer? dbUserByMail = await db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
                     currentUserId = dbUserByMail?.Id;
                 }
             }
         }
         if (currentUserId is null) return Results.Redirect("/auth/changepassword?err=auth");
 
-        var user = await db.Benutzer.FirstOrDefaultAsync(b => b.Id == currentUserId.Value);
+        Benutzer? user = await db.Benutzer.FirstOrDefaultAsync(b => b.Id == currentUserId.Value);
         if (user is null) return Results.Redirect("/auth/changepassword?err=auth");
 
-        var verify = hasher.VerifyHashedPassword(user, user.PasswordHash, curr);
+        PasswordVerificationResult verify = hasher.VerifyHashedPassword(user, user.PasswordHash, curr);
         if (verify == PasswordVerificationResult.Failed) return Results.Redirect("/auth/changepassword?err=pw");
 
         user.PasswordHash = hasher.HashPassword(user, neu);
