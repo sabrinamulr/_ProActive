@@ -56,7 +56,7 @@ namespace ProActive2508.Components.Pages.Sabrina
 
                 // Build selections: für jede globale Phase immer ein Eintrag (Reihenfolge unveränderlich)
                 selections = new List<PhaseConfig>();
-                foreach (var ph in phases)
+                foreach (Phase ph in phases)
                 {
                     ProjektPhase? ex = existingProjektPhasen.FirstOrDefault(e => e.PhasenId == ph.Id);
                     PhaseMeilenstein? exPm = null;
@@ -274,7 +274,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             public DateTime DueDate { get; set; }
             public int VerantwortlicherBenutzerId { get; set; }
             public string? Notizen { get; set; }
-            public string? Status { get; set; }    // z. B. "Grün"/"Gelb"/"Rot"/"Geplant"
+            public string? Status { get; set; }    // "Grün"/"Gelb"/"Rot"/"Geplant"
 
             // Meilenstein-spezifische Felder (vom Projektleiter gesetzt)
             public DateTime MeilensteinZieldatum { get; set; }
