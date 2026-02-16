@@ -7,7 +7,6 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @rendermode InteractiveServer
 
-
 <h2>Feedback abgeben</h2>
 
 @if (isLoading)
@@ -29,19 +28,15 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var p in projekte)
+            @foreach (Projekt p in projekte)
             {
                 <tr>
                     <td>@p.Projektbeschreibung</td>
                     <td>@p.Status</td>
                     <td>
-                        @if (p.Antworten.Any())
+                        @if (p.Antworten.Any(a => a.BenutzerId == aktuellerBenutzerId))
                         {
                             <span class="text-success fw-bold">Feedback abgegeben</span>
-                            <button class="btn btn-primary"
-                                    @onclick="@(() => StartFeedback(p.Id))">
-                                Feedback ansehen
-                            </button>
                         }
                         else
                         {
@@ -60,6 +55,7 @@ else
 @code {
     private bool isLoading = true;
     private List<Projekt>? projekte;
+    private int aktuellerBenutzerId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -68,7 +64,6 @@ else
 
         if (!user.Identity?.IsAuthenticated ?? true)
         {
-            // nicht eingeloggt → ggf. auf Login leiten oder einfach abbrechen
             isLoading = false;
             return;
         }
@@ -80,11 +75,17 @@ else
             return;
         }
 
-        int userId = int.Parse(userIdClaim.Value);
+        aktuellerBenutzerId = int.Parse(userIdClaim.Value);
 
+        // 🔥 WICHTIG: Projekte über ProjektBenutzer laden, NICHT über Projektleiter
         projekte = await _context.Projekte
-            .Where(p => p.BenutzerId == userId &&
-                        p.Status == Projektstatus.Abgeschlossen)
+            .Where(p =>
+                p.Status == Projektstatus.Abgeschlossen &&
+                _context.ProjektBenutzer.Any(pb =>
+                    pb.ProjektId == p.Id &&
+                    pb.BenutzerId == aktuellerBenutzerId
+                )
+            )
             .Include(p => p.Antworten)
             .ToListAsync();
 
