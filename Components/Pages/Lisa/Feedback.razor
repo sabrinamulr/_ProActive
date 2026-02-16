@@ -12,7 +12,6 @@
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
 
-
 <h2>Projektfeedback</h2>
 
 @if (!string.IsNullOrEmpty(StatusMessage))
@@ -22,12 +21,12 @@
 
 @if (Kategorien.Count > 0)
 {
-    var category = Kategorien[AktuelleKategorieIndex];
+    UmfrageKategorie aktuelleKategorie = Kategorien[AktuelleKategorieIndex];
 
-    <h3>@category.Name</h3>
+    <h3>@aktuelleKategorie.Name</h3>
 
     <div class="category-box">
-        @foreach (var frage in category.Fragen)
+        @foreach (Frage frage in aktuelleKategorie.Fragen)
         {
             <div class="frage">
                 <p>@frage.Text</p>
@@ -36,7 +35,7 @@
                        min="1"
                        max="5"
                        value="@Antworten[frage.Id]"
-                       @oninput="e => OnSliderChanged(e, frage.Id)" />
+                       @oninput="@(args => SliderGeaendert(args, frage.Id))" />
 
                 <span class="ms-2 fw-bold">@Antworten[frage.Id]</span>
             </div>
@@ -60,7 +59,7 @@
         else
         {
             <button class="btn btn-success"
-                    @onclick="SubmitFeedback"
+                    @onclick="FeedbackAbsenden"
                     disabled="@IsSubmitted">
                 Feedback absenden
             </button>
@@ -93,34 +92,49 @@
 
     [Parameter] public int ProjektId { get; set; }
 
-    private string? StatusMessage;
-    private List<UmfrageKategorie> Kategorien = new();
-    private Dictionary<int, int> Antworten = new();
+    private string StatusMessage;
+    private List<UmfrageKategorie> Kategorien = new List<UmfrageKategorie>();
+    private Dictionary<int, int> Antworten = new Dictionary<int, int>();
     private int AktuelleKategorieIndex = 0;
     private bool IsSubmitted = false;
-    private int CurrentUserId = 0;
+    private int AktuellerBenutzerId = 0;
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
+        AuthenticationState authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        ClaimsPrincipal benutzer = authState.User;
 
-        if (!user.Identity?.IsAuthenticated ?? true)
+        if (!benutzer.Identity.IsAuthenticated)
         {
             StatusMessage = "Nicht angemeldet. Bitte erneut anmelden.";
             return;
         }
 
-        CurrentUserId = GetUserIdFromClaims(user);
-        if (CurrentUserId <= 0)
+        // Benutzer-ID direkt auslesen (ohne extra Funktion)
+        var benutzerIdClaim = benutzer.FindFirst(ClaimTypes.NameIdentifier);
+        AktuellerBenutzerId = Convert.ToInt32(benutzerIdClaim.Value);
+
+        if (AktuellerBenutzerId <= 0)
         {
-            StatusMessage = "Kein gültiger Benutzer gefunden. Bitte neu anmelden.";
+            StatusMessage = "Benutzer konnte nicht ermittelt werden.";
             return;
         }
 
-        // Prüfen, ob dieses Projekt schon Feedback abgegeben hat
-        bool hatFeedback = await _context.Antworten
-            .AnyAsync(f => f.ProjektId == ProjektId && f.BenutzerId == CurrentUserId);
+        // Prüfen, ob bereits Feedback existiert (ohne Lambda)
+        bool hatFeedback = false;
+
+        List<Antwort> alleAntworten = await _context.Antworten
+            .Where(a => a.ProjektId == ProjektId)
+            .ToListAsync();
+
+        foreach (Antwort antwort in alleAntworten)
+        {
+            if (antwort.BenutzerId == AktuellerBenutzerId)
+            {
+                hatFeedback = true;
+                break;
+            }
+        }
 
         if (hatFeedback)
         {
@@ -132,9 +146,9 @@
         {
             Kategorien = await FeedbackService.GetKategorienAsync();
 
-            foreach (var kat in Kategorien)
+            foreach (UmfrageKategorie kategorie in Kategorien)
             {
-                foreach (var frage in kat.Fragen)
+                foreach (Frage frage in kategorie.Fragen)
                 {
                     Antworten[frage.Id] = 3;
                 }
@@ -142,54 +156,51 @@
         }
         catch (Exception ex)
         {
-            StatusMessage = "FEHLER in OnInitializedAsync: " + ex.Message;
+            StatusMessage = "Fehler beim Laden: " + ex.Message;
         }
     }
 
     private void Weiter()
     {
         if (AktuelleKategorieIndex < Kategorien.Count - 1)
+        {
             AktuelleKategorieIndex++;
+        }
     }
 
     private void Zurueck()
     {
         if (AktuelleKategorieIndex > 0)
+        {
             AktuelleKategorieIndex--;
+        }
     }
 
-    private void OnSliderChanged(ChangeEventArgs e, int frageId)
+    private void SliderGeaendert(ChangeEventArgs args, int frageId)
     {
-        int value = int.Parse(e.Value?.ToString() ?? "3");
-        Antworten[frageId] = value;
+        Antworten[frageId] = Convert.ToInt32(args.Value);
     }
 
-    private async Task SubmitFeedback()
+    private async Task FeedbackAbsenden()
     {
+        if (IsSubmitted)
+            return;
+
+        IsSubmitted = true;
+
         try
         {
-            if (IsSubmitted)
-                return;
-
-            if (CurrentUserId <= 0)
+            foreach (var eintrag in Antworten)
             {
-                StatusMessage = "Kein gültiger Benutzer gefunden. Bitte neu anmelden.";
-                IsSubmitted = false;
-                return;
-            }
+                int frageId = eintrag.Key;
+                int wert = eintrag.Value;
 
-            IsSubmitted = true;
-
-            foreach (var kvp in Antworten)
-            {
-                var antwort = new Antwort
-                {
-                    FrageId = kvp.Key,
-                    Rating = kvp.Value,
-                    ProjektId = ProjektId,
-                    BenutzerId = CurrentUserId,
-                    Datum = DateTime.Now
-                };
+                Antwort antwort = new Antwort();
+                antwort.FrageId = frageId;
+                antwort.Rating = wert;
+                antwort.ProjektId = ProjektId;
+                antwort.BenutzerId = AktuellerBenutzerId;
+                antwort.Datum = DateTime.Now;
 
                 _context.Antworten.Add(antwort);
             }
@@ -202,16 +213,5 @@
             StatusMessage = "Fehler beim Speichern: " + ex.Message;
             IsSubmitted = false;
         }
-    }
-
-    private int GetUserIdFromClaims(ClaimsPrincipal user)
-    {
-        string idStr =
-            user.FindFirstValue(ClaimTypes.NameIdentifier) ??
-            user.FindFirstValue("sub") ??
-            user.FindFirstValue("user_id") ??
-            "0";
-
-        return int.TryParse(idStr, out int id) ? id : 0;
     }
 }
