@@ -1,5 +1,4 @@
-﻿// Chart erstellen
-window.createChart = function (canvasId, chartType, data, options) {
+﻿window.createChart = function (canvasId, chartType, data, options) {
     const ctx = document.getElementById(canvasId);
 
     if (!ctx) return;
@@ -13,4 +12,4 @@ window.createChart = function (canvasId, chartType, data, options) {
         data: data,
         options: options
     });
-};
+}; //copilot

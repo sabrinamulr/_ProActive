@@ -22,10 +22,10 @@ else
 
             <dl class="row">
                 <dt class="col-sm-3">Projektleiter</dt>
-                <dd class="col-sm-9">@(_userLookup.TryGetValue(project.ProjektleiterId, out var pl) ? pl : $"Id:{project.ProjektleiterId}")</dd>
+                <dd class="col-sm-9">@(_userLookup.TryGetValue(project.ProjektleiterId, out string? pl) ? pl : $"Id:{project.ProjektleiterId}")</dd>
 
                 <dt class="col-sm-3">Auftraggeber</dt>
-                <dd class="col-sm-9">@(_userLookup.TryGetValue(project.AuftraggeberId, out var ag) ? ag : $"Id:{project.AuftraggeberId}")</dd>
+                <dd class="col-sm-9">@(_userLookup.TryGetValue(project.AuftraggeberId, out string? ag) ? ag : $"Id:{project.AuftraggeberId}")</dd>
 
                 <dt class="col-sm-3">Status</dt>
                 <dd class="col-sm-9">@project.Status</dd>
@@ -47,7 +47,7 @@ else
             else
             {
                 <div class="d-flex gap-2 flex-wrap">
-                    @foreach (var pp in projectPhases)
+                    @foreach (ProjektPhase pp in projectPhases)
                     {
                         <div class="badge bg-light text-dark border">
                             <div class="fw-semibold">@pp.Phase?.Kurzbezeichnung</div>
@@ -77,17 +77,41 @@ else
                     }
                     else
                     {
-                        var segWidth = Math.Max(8, 100 / projectPhases.Count);
-                        foreach (var seg in projectPhases)
+                        int segWidth = Math.Max(8, 100 / projectPhases.Count);
+                        foreach (ProjektPhase seg in projectPhases)
                         {
-                            var isCurrent = currentPhase != null && seg.Id == currentPhase.Id;
-                            var segStyle = $"flex:0 0 {segWidth}%; height:12px; border-radius:4px; background:{(isCurrent ? "#0d6efd" : "#e9ecef")};";
-                            var segTitle = $"{seg.Phase?.Kurzbezeichnung} {seg.StartDate:dd.MM}→{seg.DueDate:dd.MM}";
+                            bool isCurrent = currentPhase != null && seg.Id == currentPhase.Id;
+                            string segStyle = $"flex:0 0 {segWidth}%; height:12px; border-radius:4px; background:{(isCurrent ? "#0d6efd" : "#e9ecef")};";
+                            string segTitle = $"{seg.Phase?.Kurzbezeichnung} {seg.StartDate:dd.MM} --> {seg.DueDate:dd.MM}";
                             <div style="@segStyle" title="@segTitle"></div>
                         }
                     }
                 </div>
             }
+        }
+    </div>
+
+    @* Mitglieder anzeigen*?
+    <div class="mt-3">
+        <h5>Beteiligte Mitarbeiter</h5>
+        @if (projectMembers == null || !projectMembers.Any())
+        {
+            <div class="text-muted">Keine Mitglieder für dieses Projekt hinterlegt.</div>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (Benutzer m in projectMembers)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-semibold">@(string.IsNullOrWhiteSpace(m.Email) ? $"User#{m.Id}" : m.Email)</div>
+                            <div class="small text-muted">@(!string.IsNullOrWhiteSpace(m.Abteilung) ? m.Abteilung : string.Empty)</div>
+                        </div>
+                        <div class="small text-muted">Pn: @m.Personalnummer</div>
+                    </li>
+                }
+            </ul>
         }
     </div>
 
@@ -101,7 +125,7 @@ else
         else
         {
             <ul class="list-group list-group-flush">
-                @foreach (var a in projektAufgaben)
+                @foreach (Aufgabe a in projektAufgaben)
                 {
                     <li class="list-group-item d-flex justify-content-between align-items-start">
                         <div class="me-2">
@@ -111,7 +135,7 @@ else
                         <div class="text-end">
                             <div class="small text-muted">@a.Faellig.ToString("dd.MM.yyyy")</div>
                             <div class="small">Phase: @a.Phase</div>
-                            <div class="mt-1 small">@(aufgabenBenutzerLookup.TryGetValue(a.BenutzerId, out var u) ? u : $"Id:{a.BenutzerId}")</div>
+                            <div class="mt-1 small">@(aufgabenBenutzerLookup.TryGetValue(a.BenutzerId, out string? u) ? u : $"Id:{a.BenutzerId}")</div>
                         </div>
                     </li>
                 }
@@ -121,7 +145,7 @@ else
 
     @if (CanEdit(project))
     {
-        <button class="btn btn-outline-secondary" @onclick="() => editingProjectId = project?.Id ?? 0">Bearbeiten</button>
+        <button class="btn btn-outline-secondary" @onclick="(() => { editingProjectId = project?.Id ?? 0; StateHasChanged(); })">Bearbeiten</button>
     }
 
     @if (editingProjectId != 0)
@@ -133,21 +157,3 @@ else
 <style>
     .timeline { align-items:center; margin-top:6px; }
 </style>
-
-@code {
-    private int editingProjectId = 0;
-
-    private async Task OnModalSaved()
-    {
-        editingProjectId = 0;
-        // reload details inplace
-        await LoadAsync();
-        StateHasChanged();
-    }
-
-    private Task OnModalCancelled()
-    {
-        editingProjectId = 0;
-        return Task.CompletedTask;
-    }
-}

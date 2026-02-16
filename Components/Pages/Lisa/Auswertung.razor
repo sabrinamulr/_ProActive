@@ -18,7 +18,6 @@
     }
     else
     {
-        <!-- ⭐ GLOBALER PROJEKTVERGLEICH -->
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-light">
                 <strong>Projektvergleich – Durchschnitt pro Projekt (alle Projekte)</strong>
@@ -46,7 +45,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var p in projektDurchschnitte)
+                            @foreach (ProjektDurchschnitt p in projektDurchschnitte)
                             {
                                 <tr>
                                     <td>@p.ProjektId</td>
@@ -60,7 +59,6 @@
             </div>
         </div>
 
-        <!-- ⭐ DETAILANSICHT -->
         @if (selectedProjectId != null && aktuellesProjekt != null)
         {
             <div class="card mb-4">
@@ -76,17 +74,14 @@
                     {
                         <div class="row">
                             <div class="col-lg-6">
-                                <!-- ⭐ STERNVERTEILUNG -->
                                 <h4 class="mt-4">Sternverteilung (Projekt)</h4>
                                 <canvas id="sternChart" height="200"></canvas>
 
-                                <!-- ⭐ KATEGORIE-AUSWERTUNG -->
                                 <h4 class="mt-4">Durchschnitt pro Kategorie</h4>
                                 <canvas id="kategorieChart" height="200"></canvas>
                             </div>
 
                             <div class="col-lg-6">
-                                  <!-- ⭐ ALLE ANTWORTEN -->
                                 <h4 class="mt-4">Anzahl der Antworten per Kategorie</h4>
                                 <table class="table table-striped">
                                     <thead>
@@ -96,7 +91,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach (var k in kategorieAuswertungenProjekt)
+                                        @foreach (KategorieAuswertung k in kategorieAuswertungenProjekt)
                                         {
                                             <tr>
                                                 <td>@k.KategorieName</td>
@@ -106,7 +101,6 @@
                                     </tbody>
                                 </table>
 
-                                <!-- Tabelle Kategorien -->
                                 <h4 class="mt-4">Kategorien - Durchschnitt</h4>
                                 <table class="table table-striped">
                                     <thead>
@@ -116,7 +110,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach (var k in kategorieAuswertungenProjekt)
+                                        @foreach (KategorieAuswertung k in kategorieAuswertungenProjekt)
                                         {
                                             <tr>
                                                 <td>@k.KategorieName</td>
@@ -142,7 +136,6 @@
             <p class="mt-3">Bitte ein Projekt auswählen, um Details zu sehen.</p>
         }
 
-        <!-- ⭐ PROJEKT-AUSWAHL -->
         <div class="card mb-4">
             <div class="card-header">
                 <strong>Projekt auswählen (Detailansicht)</strong>
@@ -151,7 +144,7 @@
                 <select class="form-select w-auto"
                         @onchange="OnProjectChanged">
                     <option value="">-- Bitte wählen --</option>
-                    @foreach (var p in projektListe)
+                    @foreach (Projekt p in projektListe)
                     {
                         <option value="@p.Id">@p.Projektbeschreibung</option>
                     }
@@ -162,61 +155,55 @@
 </div>
 
 @code {
-    // 🔹 ALLE DEINE ALTEN FELDER UND KLASSEN
 
-    private bool isLoading = true;
+    private bool isLoading = true; //ob die Seite lädt
 
-    // Globale Daten (alle Antworten)
-    private List<Antwort> alleAntworten = new();
-    private List<Projekt> projektListe = new();
+    private List<Antwort> alleAntworten = new(); //Alle Antworten aus der Datenbank
+    private List<Projekt> projektListe = new(); //alle Projekte aus der DB
 
-    // Globale Auswertungen
-    private List<ProjektDurchschnitt> projektDurchschnitte = new();
+    private List<ProjektDurchschnitt> projektDurchschnitte = new(); //Durchschnittsbewertung pro Projekt
 
-    // Auswahl für Detail
-    private int? selectedProjectId = null;
-    private Projekt? aktuellesProjekt;
-    private List<Antwort> antwortenProjekt = new();
+    private int? selectedProjectId = null; //speichert id des ausgewählten Projekts, null = noch kein Projekt ausgewählt
+    private Projekt? aktuellesProjekt; //das aktuell ausgewählte Projekt als objekt
+    private List<Antwort> antwortenProjekt = new(); //alle antworten nur für das ausgewählte projekt
 
-    // Sternverteilung pro Projekt
-    private List<RatingItem> ratingItemsProjekt = new();
+    private List<RatingItem> ratingItemsProjekt = new(); //anzahl der 1-stern, ... bewertungen für das Projekt
 
-    // Kategorien pro Projekt
-    private List<KategorieAuswertung> kategorieAuswertungenProjekt = new();
+    private List<KategorieAuswertung> kategorieAuswertungenProjekt = new(); //durchschnittsbewertungen pro Kategorie
 
-    // Hilfsklassen
-    private class RatingItem
+    //hilfsklassen
+    private class RatingItem //sterndiagramm
     {
-        public string Category { get; set; } = "";
-        public int Value { get; set; }
+        public string Category { get; set; } = ""; //1 Stern,...
+        public int Value { get; set; } //anzahl
     }
 
-    public class KategorieAuswertung
+    public class KategorieAuswertung //kategorie auswertung
     {
         public string KategorieName { get; set; } = "";
         public double Durchschnitt { get; set; }
-        public int Anzahl { get; set; }
+        public int Anzahl { get; set; } //antworten diser kat
 
     }
 
-    public class ProjektDurchschnitt
+    public class ProjektDurchschnitt //projektvergleih diagramm
     {
         public int ProjektId { get; set; }
         public string ProjektName { get; set; } = "";
         public double Durchschnitt { get; set; }
     }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() //Daten werden beim initialen Laden der Seite geholt und berechnet
     {
-        isLoading = true;
+        isLoading = true; //ladeseite aktiviert
 
-        // Alle Projekte
+        //holt alle preojekte aus der db
         projektListe = await _context.Projekte
-            .AsNoTracking()
+            .AsNoTracking() //schneller, weil keine änderungen gespeichert werden müssen
             .OrderBy(p => p.Id)
             .ToListAsync();
 
-        // Alle Antworten inkl. Projekt / Frage / Kategorie
+        //alle Antworten inkl. Projekt / Frage / Kategorie
         alleAntworten = await _context.Antworten
             .Include(a => a.Projekt)
             .Include(a => a.Frage)
@@ -224,39 +211,95 @@
             .AsNoTracking()
             .ToListAsync();
 
-        BerechneProjektDurchschnitte();
+        BerechneProjektDurchschnitte(); //durchschnittsbewertungen pro projekt berechnen
 
-        isLoading = false;
+        isLoading = false; //seite ist fertig geladen
     }
 
     private void BerechneProjektDurchschnitte()
     {
-        projektDurchschnitte = alleAntworten
-            .Where(a => a.Projekt != null)
-            .GroupBy(a => a.ProjektId)
-            .Select(g => new ProjektDurchschnitt
+        //liste für Antworten die ein Projekt besitzen
+        List<Antwort> gefilterteAntworten = new List<Antwort>();
+
+        // .Where(a => a.Projekt != null) ersetzt:
+        //schleife filtert alle antworten bei denen ein Projekt existiert
+        foreach (Antwort antwort in alleAntworten)
+        {
+            if (antwort.Projekt != null)
             {
-                ProjektId = g.Key,
-                ProjektName = g.First().Projekt!.Projektbeschreibung,
-                Durchschnitt = g.Average(a => a.Rating)
-            })
-            .OrderBy(p => p.ProjektId)
-            .ToList();
+                gefilterteAntworten.Add(antwort);
+            }
+        }
+
+        // Dictionary für Gruppierung nach ProjektId
+        // ersetzt .GroupBy(a => a.ProjektId)
+        Dictionary<int, List<Antwort>> gruppen = new Dictionary<int, List<Antwort>>();
+
+        foreach (Antwort antwort in gefilterteAntworten)
+        {
+            int key = antwort.ProjektId; //gruppierungsschlüssel = ProjektId
+
+            //wenn Gruppe noch nicht existiert --> neue Liste anlegen
+            if (!gruppen.ContainsKey(key))
+            {
+                gruppen[key] = new List<Antwort>();
+            }
+
+            //antwort zur passenden Gruppe hinzufügen
+            gruppen[key].Add(antwort);
+        }
+
+        //liste für die berechneten Projektdurchschnitte
+        List<ProjektDurchschnitt> liste = new List<ProjektDurchschnitt>();
+
+        // ersetzt .Select(g => new ProjektDurchschnitt { ... })
+        foreach (var gruppe in gruppen)
+        {
+            int projektId = gruppe.Key; //schlüssel = ProjektId
+            List<Antwort> antworten = gruppe.Value; //alle Antworten zu diesem Projekt
+
+            ProjektDurchschnitt pd = new ProjektDurchschnitt();
+            pd.ProjektId = projektId;
+
+            //projektname aus erster Antwort entnehmen
+            pd.ProjektName = antworten[0].Projekt!.Projektbeschreibung;
+
+            //durchschnitt berechnen
+            double summe = 0;
+            foreach (Antwort a in antworten)
+            {
+                summe =summe + a.Rating;
+            }
+            pd.Durchschnitt = summe / antworten.Count;
+
+            liste.Add(pd);
+        }
+
+        liste.Sort((x, y) => x.ProjektId.CompareTo(y.ProjektId));
+
+        //ergebnis speichern
+        projektDurchschnitte = liste;
     }
 
-    private async Task OnProjectChanged(ChangeEventArgs e)
+    private async Task OnProjectChanged(ChangeEventArgs e) //wenn der benutzer ein projekt auswählt wird die id gespeichert
     {
         if (int.TryParse(e.Value?.ToString(), out int id))
+        {
             selectedProjectId = id;
+
+        }
         else
+        {
             selectedProjectId = null;
 
-        await LadeProjektDetails();
+        }
+
+        await LadeProjektDetails(); //danach werden die details des projekts geladen
     }
 
     private async Task LadeProjektDetails()
     {
-        if (selectedProjectId == null)
+        if (selectedProjectId == null) //wenn kein projekt ausgewählt wird --> alles zurücksetzen
         {
             aktuellesProjekt = null;
             antwortenProjekt.Clear();
@@ -265,29 +308,40 @@
             return;
         }
 
-        aktuellesProjekt = await _context.Projekte
+        aktuellesProjekt = await _context.Projekte //holt das ausgewählte projekt aus der db
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == selectedProjectId.Value);
 
-        antwortenProjekt = alleAntworten
-            .Where(a => a.ProjektId == selectedProjectId.Value)
-            .ToList();
+        // ersetzt:
+        // .Where(a => a.ProjektId == selectedProjectId.Value).ToList();
+        antwortenProjekt = new List<Antwort>();
+
+        foreach (Antwort a in alleAntworten)
+        {
+            if (a.ProjektId == selectedProjectId.Value)
+            {
+                antwortenProjekt.Add(a);
+            }
+        }
 
         BerechneSternverteilungProjekt();
         BerechneKategorieAuswertungProjekt();
+        //sternverteilung und kategorie durchschnitt wird berechnet
     }
 
     private void BerechneSternverteilungProjekt()
     {
-        var counts = new int[5];
+        int[] counts = new int[5]; //array 1-5 sterne
 
-        foreach (var a in antwortenProjekt)
+        foreach (Antwort a in antwortenProjekt) //zählt wie oft jde sternzahl vorkommt
         {
             if (a.Rating >= 1 && a.Rating <= 5)
+            {
                 counts[a.Rating - 1]++;
+            }
         }
 
-        ratingItemsProjekt = new()
+        ratingItemsProjekt = new() //erstellt die liste für das diagramm
         {
             new RatingItem { Category = "1 Stern", Value = counts[0] },
             new RatingItem { Category = "2 Sterne", Value = counts[1] },
@@ -299,28 +353,63 @@
 
     private void BerechneKategorieAuswertungProjekt()
     {
-        kategorieAuswertungenProjekt = antwortenProjekt
-            .GroupBy(a => a.Frage.KategorieId)
-            .Select(g => new KategorieAuswertung
+        // Dictionary für Gruppierung nach KategorieId
+        // ersetzt .GroupBy(a => a.Frage.KategorieId)
+        Dictionary<int, List<Antwort>> gruppen = new Dictionary<int, List<Antwort>>();
+
+        foreach (Antwort antwort in antwortenProjekt)
+        {
+            int key = antwort.Frage.KategorieId;
+
+            if (!gruppen.ContainsKey(key))
             {
-                KategorieName = g.First().Frage.Kategorie.Name,
-                Durchschnitt = g.Average(a => a.Rating),
-                Anzahl = g.Count()
-            })
-            .OrderBy(k => k.KategorieName)
-            .ToList();
+                gruppen[key] = new List<Antwort>();
+            }
+
+            gruppen[key].Add(antwort);
+        }
+
+        //liste für Kategorie-Auswertungen
+        List<KategorieAuswertung> liste = new List<KategorieAuswertung>();
+
+        // ersetzt .Select(g => new KategorieAuswertung { ... })
+        foreach (var gruppe in gruppen)
+        {
+            int kategorieId = gruppe.Key;
+            List<Antwort> antworten = gruppe.Value;
+
+            KategorieAuswertung auswertung = new KategorieAuswertung();
+
+            //name der Kategorie aus erster Antwort
+            auswertung.KategorieName = antworten[0].Frage.Kategorie.Name;
+
+            double summe = 0;
+            foreach (Antwort a in antworten)
+            {
+                summe = summe + a.Rating;
+            }
+            auswertung.Durchschnitt = summe / antworten.Count;
+
+            // Anzahl der Antworten
+            auswertung.Anzahl = antworten.Count;
+
+            liste.Add(auswertung);
+        }
+
+        liste.Sort((x, y) => x.KategorieName.CompareTo(y.KategorieName));
+
+        kategorieAuswertungenProjekt = liste;
     }
 
-    // 🔹 NEU: Chart.js Rendering
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (projektDurchschnitte.Any())
+        if (projektDurchschnitte.Any()) //wenn es projektdaten gibt --> diagramm rendern
         {
             await RenderProjektVergleichChart();
         }
 
-        if (selectedProjectId != null && antwortenProjekt.Any())
+        if (selectedProjectId != null && antwortenProjekt.Any())//wenn ein projekt ausgewählt ist --> stern und kategorie diagramm rendern
         {
             await RenderSternChart();
             await RenderKategorieChart();

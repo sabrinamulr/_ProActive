@@ -41,7 +41,7 @@ public partial class AufgabenCompact : ComponentBase
         isLoading = true;
         try
         {
-            var auth = await Auth.GetAuthenticationStateAsync();
+            AuthenticationState auth = await Auth.GetAuthenticationStateAsync();
             ClaimsPrincipal user = auth.User;
 
             CurrentUserEmail = user.FindFirst(ClaimTypes.Email)?.Value ?? user.Identity?.Name ?? string.Empty;
@@ -56,15 +56,17 @@ public partial class AufgabenCompact : ComponentBase
             isProjektleiter = user.IsInRole("Projektleiter");
 
             // lade kompakte Aufgabenliste für aktuellen Benutzer (ähnlich wie Aufgabenseite)
-            tasks = await Db.Set<Aufgabe>()
+            List<Aufgabe> loaded = await Db.Set<Aufgabe>()
                 .AsNoTracking()
                 .Where(a => a.BenutzerId == CurrentUserId)
                 .OrderBy(a => a.Faellig)
                 .ToListAsync();
 
+            tasks = loaded;
+
             // Modal Hilfsdaten
             Projekt keinProjekt = new Projekt { Id = 0, Projektbeschreibung = "(kein Projekt)" };
-            var relevante = await Db.Set<Projekt>()
+            List<Projekt> relevante = await Db.Set<Projekt>()
                 .Where(p => p.BenutzerId == CurrentUserId || p.ProjektleiterId == CurrentUserId)
                 .OrderBy(p => p.Projektbeschreibung)
                 .ToListAsync();
@@ -100,7 +102,7 @@ public partial class AufgabenCompact : ComponentBase
 
     protected async Task OpenEditModal(int id)
     {
-        var found = await Db.Set<Aufgabe>().AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
+        Aufgabe? found = await Db.Set<Aufgabe>().AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
         if (found == null) return;
 
         editModel = new Aufgabe
@@ -193,7 +195,8 @@ public partial class AufgabenCompact : ComponentBase
 
         if (!benutzerIds.Contains(CurrentUserId)) benutzerIds.Add(CurrentUserId);
 
-        var benutzer = await Db.Set<Benutzer>().AsNoTracking()
+        List<Benutzer> benutzer = await Db.Set<Benutzer>()
+            .AsNoTracking()
             .Where(b => benutzerIds.Contains(b.Id))
             .Select(b => new Benutzer { Id = b.Id, Email = b.Email ?? string.Empty })
             .OrderBy(b => b.Email)

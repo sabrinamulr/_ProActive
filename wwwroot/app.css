@@ -58,7 +58,6 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
-/* Einheitliche Button-Farbe für ALLE Buttons */
 .btn,
 .btn:hover,
 .btn:focus,
@@ -68,7 +67,6 @@ h1:focus {
     color: white !important;
 }
 
-/* Link-Buttons */
 .btn-link,
 .btn-link:hover,
 .btn-link:focus {
@@ -76,7 +74,6 @@ h1:focus {
     text-decoration: none;
 }
 
-/* Outline-Buttons */
 .btn-outline-primary,
 .btn-outline-primary:hover,
 .btn-outline-primary:focus {
@@ -84,7 +81,6 @@ h1:focus {
     background-color: #74181E !important;
     border-color: #74181E !important;
 }
-/* Zentriert alles vertikal & horizontal */
 .login-wrapper {
     min-height: 100vh;
     display: flex;
@@ -94,12 +90,10 @@ h1:focus {
     gap: 1.5rem;
 }
 
-/* Logo */
 .login-logo {
     width: 150px;
 }
 
-/* Form soll nicht auseinanderfallen */
 .login-form {
     width: 100%;
     max-width: 420px;
@@ -109,7 +103,6 @@ h1:focus {
     gap: 1rem;
 }
 
-/* Card */
 .login-card {
     width: 100%;
     border-radius: 16px;
@@ -117,7 +110,6 @@ h1:focus {
     color: white;
 }
 
-/* Button */
 .login-button {
     width: 100%;
     background: black;
