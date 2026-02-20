@@ -49,10 +49,10 @@ else
                             </div>
 
                             <hr />
-                            <h6>Mitglieder</h6>
+                            <h6>Mitarbeiter</h6>
 
                             <div class="mb-3">
-                                <label class="form-label">Auswählen (Checkboxen)</label>
+                                
                                 <div class="border rounded p-2" style="max-height:220px; overflow:auto;">
                                     @if (allUsers != null && allUsers.Any())
                                     {
@@ -69,11 +69,10 @@ else
                                         <div class="text-muted">Keine Benutzer vorhanden.</div>
                                     }
                                 </div>
-                                <div class="form-text">Wähle mehrere Mitarbeiter über die Checkboxen aus.</div>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Aktuelle Mitglieder</label>
+                            @* <div class="mb-3">
+                                <label class="form-label">Ausgewählte Mitarbeiter</label>
                                 <div>
                                     @if (selectedMemberIds == null || !selectedMemberIds.Any())
                                     {
@@ -93,7 +92,7 @@ else
                                         </ul>
                                     }
                                 </div>
-                            </div>
+                            </div> *@
 
                             @if (editPhaseSelections != null && editPhaseSelections.Any())
                             {

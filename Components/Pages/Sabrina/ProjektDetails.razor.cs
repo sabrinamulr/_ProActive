@@ -10,6 +10,11 @@ using ProActive2508.Models.Entity.Anja;
 
 namespace ProActive2508.Components.Pages.Sabrina
 {
+    // Detailansicht für ein einzelnes Projekt.
+    // Verantwortlich für:
+    // - Laden des Projekts und zugehöriger Phasen, Mitglieder und Aufgaben
+    // - Bestimmung der aktuellen Phase
+    // - Steuern eines Edit-Modals für das Projekt
     public partial class ProjektDetails : ComponentBase
     {
         [Parameter] public int Id { get; set; }
@@ -20,32 +25,36 @@ namespace ProActive2508.Components.Pages.Sabrina
         protected bool isEditing = false;
         protected Dictionary<int, string> _userLookup = new();
 
-        // neu: Phasen-Daten & Rollenflag
+        // Phasen-Daten & Rollenflag
         protected List<ProjektPhase>? projectPhases;
         protected ProjektPhase? currentPhase;
         protected bool isProjektleiterRole = false;
 
-        // neu: aktuelle Benutzer-Id speichern
+        // aktuelle Benutzer-Id
         private int CurrentUserId;
 
-        // neu: Aufgaben für dieses Projekt
+        // Aufgaben für dieses Projekt
         protected List<Aufgabe> projektAufgaben = new List<Aufgabe>();
         protected Dictionary<int, string> aufgabenBenutzerLookup = new();
 
-        // neu: Mitglieder
+        // Mitglieder
         protected List<Benutzer> projectMembers = new List<Benutzer>();
 
-        // Modal state (moved from Razor to code-behind)
+        // Modal state
         protected int editingProjectId = 0;
 
         [Inject] private AppDbContext Db { get; set; } = default!;
         [CascadingParameter] private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
 
+        // OnParametersSetAsync: ruft LoadAsync auf, wenn Parameter (z. B. Id) sich ändern
         protected override async Task OnParametersSetAsync()
         {
             await LoadAsync();
         }
 
+        // LoadAsync: Lädt alle relevanten Daten für die Detailansicht
+        // - ermittelt aktuellen Benutzer
+        // - lädt Projekt, Benutzer-Lookup, Phasen, Aufgaben und Mitglieder
         private async Task LoadAsync()
         {
             isLoading = true;
@@ -72,13 +81,13 @@ namespace ProActive2508.Components.Pages.Sabrina
                     }
                 }
 
-                // speichere die aktuelle BenutzerId für spätere Berechnungen
+                // speichere die aktuelle BenutzerId
                 CurrentUserId = currentUserId;
 
                 project = await Db.Projekte.AsNoTracking().FirstOrDefaultAsync(p => p.Id == Id);
                 if (project is null)
                 {
-                    // keep lookups empty
+                    // initialisiere leere Lookups
                     _userLookup = new Dictionary<int, string>();
                     projectPhases = new List<ProjektPhase>();
                     currentPhase = null;
@@ -106,9 +115,8 @@ namespace ProActive2508.Components.Pages.Sabrina
                     _userLookup = new Dictionary<int, string>();
                 }
 
-                // Berechtigung prüfen: Rolle Projektleiter oder spezifischer Projektleiter
+                // Berechtigung prüfen: Rolle Projektleiter
                 isProjektleiterRole = user.IsInRole("Projektleiter");
-                // note: CanEdit wird über Methode berechnet (siehe unten)
 
                 // Phasen + aktuelle Phase laden
                 projectPhases = await Db.ProjektPhasen
@@ -123,17 +131,15 @@ namespace ProActive2508.Components.Pages.Sabrina
                     ProjektPhase? active = null;
                     DateTime today = DateTime.Today;
 
-                    // bevorzugt: aktive Phase (StartDate <= today <= DueDate and Abschlussdatum null or >= today)
+                    // suche aktive Phase nach Datum
                     active = projectPhases.FirstOrDefault(pp =>
                         pp.StartDate.Date <= today && pp.DueDate.Date >= today && (pp.Abschlussdatum == null || pp.Abschlussdatum.Value.Date >= today));
 
-                    // fallback: die letzte gestartete Phase vor heute
                     if (active == null)
                     {
                         active = projectPhases.Where(pp => pp.StartDate.Date <= today).OrderByDescending(pp => pp.StartDate).FirstOrDefault();
                     }
 
-                    // sonst: erste Phase
                     if (active == null)
                     {
                         active = projectPhases.OrderBy(pp => pp.StartDate).FirstOrDefault();
@@ -146,14 +152,14 @@ namespace ProActive2508.Components.Pages.Sabrina
                     currentPhase = null;
                 }
 
-                // --- Aufgaben für dieses Projekt laden ---
+                // Aufgaben für dieses Projekt laden
                 projektAufgaben = await Db.Set<Aufgabe>()
                     .AsNoTracking()
                     .Where(a => a.ProjektId.HasValue && a.ProjektId.Value == project.Id)
                     .OrderBy(a => a.Faellig)
                     .ToListAsync();
 
-                var benutzerIds = projektAufgaben.Select(a => a.BenutzerId).Where(id => id > 0).Distinct().ToList();
+                List<int> benutzerIds = projektAufgaben.Select(a => a.BenutzerId).Where(id => id > 0).Distinct().ToList();
                 if (benutzerIds.Count > 0)
                 {
                     aufgabenBenutzerLookup = await Db.Benutzer
@@ -166,8 +172,8 @@ namespace ProActive2508.Components.Pages.Sabrina
                     aufgabenBenutzerLookup = new Dictionary<int, string>();
                 }
 
-                // --- Mitglieder für dieses Projekt laden ---
-                var memberIds = await Db.ProjektBenutzer
+                // Mitglieder für dieses Projekt laden
+                List<int> memberIds = await Db.ProjektBenutzer
                     .AsNoTracking()
                     .Where(pb => pb.ProjektId == project.Id)
                     .Select(pb => pb.BenutzerId)
@@ -176,11 +182,13 @@ namespace ProActive2508.Components.Pages.Sabrina
 
                 if (memberIds != null && memberIds.Count > 0)
                 {
-                    projectMembers = await Db.Benutzer
+                    List<Benutzer> benutzer = await Db.Benutzer
                         .AsNoTracking()
                         .Where(b => memberIds.Contains(b.Id))
                         .OrderBy(b => b.Email)
                         .ToListAsync();
+
+                    projectMembers = benutzer;
                 }
                 else
                 {
@@ -189,6 +197,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             }
             catch
             {
+                // Bei Fehlern werden alle View-Daten wieder auf sichere leere Werte gesetzt
                 project = null;
                 _userLookup = new Dictionary<int, string>();
                 projectPhases = new List<ProjektPhase>();
@@ -206,13 +215,14 @@ namespace ProActive2508.Components.Pages.Sabrina
             }
         }
 
-        // Methode zur Berechnung der Bearbeitungsberechtigung (wird in Razor aufgerufen)
+        // Prüft, ob das Projekt bearbeitet werden darf (UI-Logik)
         protected bool CanEdit(Projekt? p)
         {
             if (p is null) return false;
             return isProjektleiterRole || p.ProjektleiterId == CurrentUserId;
         }
 
+        // EnableEdit: bereitet das editModel vor und setzt Editing-Flag
         protected void EnableEdit()
         {
             if (project is null)
@@ -230,17 +240,16 @@ namespace ProActive2508.Components.Pages.Sabrina
                     AuftraggeberId = project.AuftraggeberId,
                     Status = project.Status,
                     Phase= project.Phase, 
-                    //PhaseDefinition = project.PhaseDefinition, // Optional, falls benötigt
                 };
                 isEditing = true;
             }
                 
         }
 
+        // SaveAsync: speichert Änderungen am Projekt (vereinfachte Variante)
         protected async Task SaveAsync()
         {
             if (editModel is null) return;
-            // Serverseitige Berechtigungsprüfung nicht nochmals gezeigt, aber empfohlen
             try
             {
                 Db.Projekte.Update(editModel);
@@ -260,11 +269,10 @@ namespace ProActive2508.Components.Pages.Sabrina
             editModel = null;
         }
 
-        // Modal callbacks moved here so Razor can be code-behind-only
+        // Modal callbacks
         protected async Task OnModalSaved()
         {
             editingProjectId = 0;
-            // reload details inplace
             await LoadAsync();
             StateHasChanged();
         }
@@ -275,7 +283,6 @@ namespace ProActive2508.Components.Pages.Sabrina
             return Task.CompletedTask;
         }
 
-        // Open modal for editing
         protected void OpenEditModal(int projektId)
         {
             editingProjectId = projektId;

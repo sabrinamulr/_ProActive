@@ -27,8 +27,8 @@ else
             {
                 <li class="list-group-item d-flex justify-content-between align-items-start">
                     <div class="me-2">
-                        <div class="fw-bold">#@a.Id</div>
-                        <div class="text-truncate" style="max-width:18rem;">@a.Aufgabenbeschreibung</div>
+                        <div class="fw-bold">@a.Aufgabenbeschreibung</div>
+                        @* <div class="text-truncate" style="max-width:18rem;">@a.Projekt</div> *@
                     </div>
                     <div class="text-end">
                         <div class="small text-muted">@a.Faellig.ToString("dd.MM.yyyy")</div>
@@ -49,7 +49,8 @@ else
     }
 }
 
-@* Modal: gleiche UI wie auf Aufgabenseite (kopiert, damit Verhalten identisch ist) *@
+@* Modal: gleiche UI wie auf Aufgabenseite (kopiert von Anja, damit Verhalten identisch ist)
+   Logik von Anja, Sabrina nur bessere/übersichtlichere/kompaktere Darstellung für Startseite (unnötiges weggelassen)*@
 @if (isModalOpen)
 {
     <div class="modal-backdrop show"></div>
@@ -90,8 +91,8 @@ else
                                                  Items="benutzerChoicesForModal"
                                                  Placeholder="-- Bearbeiter wählen --"
                                                  LabelSelector="@(b => b.Id == CurrentUserId
-                                                                                                      ? $"Ich ({(string.IsNullOrWhiteSpace(b.Email) ? "User" : b.Email)})"
-                                                                                                      : $"{(string.IsNullOrWhiteSpace(b.Email) ? "User" : b.Email)} (Id:{b.Id})")"
+                                                 ? $"Ich ({(string.IsNullOrWhiteSpace(b.Email) ? "User" : b.Email)})"
+                                                 : $"{(string.IsNullOrWhiteSpace(b.Email) ? "User" : b.Email)} (Id:{b.Id})")"
                                                  Search="@bearbeiterSearch"
                                                  SearchChanged="@(val => bearbeiterSearch = val)"
                                                  OnItemSelected="OnBearbeiterSelected" />

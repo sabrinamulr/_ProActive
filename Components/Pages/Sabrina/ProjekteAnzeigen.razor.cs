@@ -10,9 +10,14 @@ using ProActive2508.Models.Entity.Anja;
 
 namespace ProActive2508.Components.Pages.Sabrina
 {
+    // Komponente zur Anzeige der Projektliste ("Meine Projekte").
+    // Verantwortlich für:
+    // - Laden der relevanten Projekte für den aktuellen Benutzer
+    // - Aufbau von Lookup-Tabellen für Benutzer und Phasen
+    // - Steuerung eines Edit-Modals (Projektbearbeitung)
     public partial class ProjekteAnzeigen : ComponentBase
     {
-        // Daten für View (werden im OnInitializedAsync geladen)
+        // Daten für die View (werden in OnInitializedAsync geladen)
         protected List<Projekt>? projects;
         protected Dictionary<int, string> userLookup = new();
         protected bool isLoading = true;
@@ -36,6 +41,12 @@ namespace ProActive2508.Components.Pages.Sabrina
 
         private int CurrentUserId;
 
+        // OnInitializedAsync: Lädt initial die Projektliste und die zugehörigen Lookups.
+        // Ablauf:
+        // - AuthState auslesen und BenutzerId bestimmen
+        // - Projekte je nach Rolle (Projektleiter = alle, sonst nur beteiligte) laden
+        // - Benutzer-Lookup für angezeigte Projekte erstellen
+        // - Projektphasen für die angezeigten Projekte laden und aktuelle Phase ermitteln
         protected override async Task OnInitializedAsync()
         {
             isLoading = true;
@@ -164,6 +175,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             }
         }
 
+        // CanEdit: prüft, ob die aktuelle Session die Projektbearbeitung erlauben soll
         protected bool CanEdit(Projekt p)
         {
             return isProjektleiterRole || p.ProjektleiterId == CurrentUserId;
@@ -185,12 +197,14 @@ namespace ProActive2508.Components.Pages.Sabrina
             await Task.CompletedTask;
         }
 
+        // Callback: Modal wurde abgebrochen
         protected Task ModalCancelled()
         {
             editingProjectId = 0;
             return Task.CompletedTask;
         }
 
+        // Hilfsklasse: Konfiguration einer Phase im Edit-Dialog
         protected class PhaseEditConfig
         {
             public int ExistingId { get; set; }

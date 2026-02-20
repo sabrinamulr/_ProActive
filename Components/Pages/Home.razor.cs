@@ -23,8 +23,8 @@ namespace ProActive2508.Components.Pages
             isLoading = true;
             try
             {
-                var auth = await AuthenticationStateTask;
-                var user = auth.User;
+                AuthenticationState auth = await AuthenticationStateTask;
+                System.Security.Claims.ClaimsPrincipal user = auth.User;
 
                 if (user?.Identity?.IsAuthenticated != true)
                 {
@@ -32,31 +32,39 @@ namespace ProActive2508.Components.Pages
                     return;
                 }
 
-                // Ermittle aktuellen Benutzer-Id aus Claims (wie im Projekt üblich)
-                var idClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                // Ermittle aktuellen BenutzerId aus Claims 
+                string? idClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                               ?? user.FindFirst("sub")?.Value;
                 int currentUserId = 0;
                 if (!int.TryParse(idClaim, out currentUserId) || currentUserId <= 0)
                 {
-                    var name = user.Identity?.Name ?? string.Empty;
-                    if (!string.IsNullOrWhiteSpace(name) && int.TryParse(name, out var pn))
+                    string name = user.Identity?.Name ?? string.Empty;
+                    int pn;
+                    if (!string.IsNullOrWhiteSpace(name) && int.TryParse(name, out pn))
                     {
-                        var dbUser = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == pn);
+                        Benutzer? dbUser = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Personalnummer == pn);
                         currentUserId = dbUser?.Id ?? 0;
                     }
                     else
                     {
-                        var dbUserByMail = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
+                        Benutzer? dbUserByMail = await Db.Benutzer.AsNoTracking().FirstOrDefaultAsync(b => b.Email == name);
                         currentUserId = dbUserByMail?.Id ?? 0;
                     }
                 }
 
-                // Lade Projekte, die den Nutzer betreffen (Owner, Projektleiter, Auftraggeber)
+                // Lade Projekte, die den Nutzer betreffen (Projektleiter oder Mitglied)
+                List<int> memberProjectIds = await Db.ProjektBenutzer
+                    .AsNoTracking()
+                    .Where(pb => pb.BenutzerId == currentUserId)
+                    .Select(pb => pb.ProjektId)
+                    .ToListAsync();
+
                 projects = await Db.Projekte
                     .AsNoTracking()
                     .Where(p => p.BenutzerId == currentUserId
                                 || p.ProjektleiterId == currentUserId
-                                || p.AuftraggeberId == currentUserId)
+                                || p.AuftraggeberId == currentUserId
+                                || memberProjectIds.Contains(p.Id))
                     .OrderBy(p => p.Id)
                     .ToListAsync();
             }

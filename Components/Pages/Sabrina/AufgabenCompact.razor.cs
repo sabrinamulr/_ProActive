@@ -7,35 +7,49 @@ using System.Security.Claims;
 
 namespace ProActive2508.Components.Pages.Sabrina;
 
+// Kompaktes Widget, das eine kurze Aufgabenliste für den aktuellen Benutzer anzeigt.
+// Verantwortlichkeiten:
+// - Laden einer kompakten Aufgabenliste für den aktuellen Benutzer
+// - Bereitstellung einfacher Create/Edit-Modalfunktionen
+// - Hilfsmethoden zum Auswählen von Projekt / Bearbeiter
 public partial class AufgabenCompact : ComponentBase
 {
     [Parameter] public int MaxItems { get; set; } = 5;
 
-    // Inject properties are provided by the .razor file's @inject directives,
-    // remove duplicate [Inject] declarations here to avoid ambiguity.
+    // Inject-Eigenschaften werden in der zugehörigen .razor-Datei per @inject bereitgestellt.
+    // Hier keine zusätzlichen [Inject]-Deklarationen, um Mehrdeutigkeiten zu vermeiden.
 
     protected bool isLoading = true;
     protected bool isModalOpen = false;
     protected string modalTitle = string.Empty;
 
+    // Angezeigte Aufgaben (kompakte Liste)
     protected List<Aufgabe> tasks = new();
+    // Modell, das im Create/Edit-Modal verwendet wird
     protected Aufgabe editModel = new Aufgabe();
 
+    // Hilfslisten für Modal-Dropdowns
     protected List<Projekt> projektChoicesForModal = new();
     protected string projektSearch = string.Empty;
 
     protected List<Benutzer> benutzerChoicesForModal = new();
     protected string bearbeiterSearch = string.Empty;
 
+    // Kontext des aktuellen Benutzers (wird in LoadAsync gefüllt)
     protected int CurrentUserId { get; private set; }
     protected string CurrentUserEmail { get; private set; } = string.Empty;
     protected bool isProjektleiter = false;
 
+    // Komponenten-Lifecycle: beim Initialisieren Daten laden
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
     }
 
+    // LoadAsync: Lädt die kompakte Aufgabenliste und die unterstützenden Modal-Daten.
+    // - Liest den AuthenticationState, um den aktuellen Benutzer zu ermitteln
+    // - Fragt Aufgaben und Projekt-Auswahlmöglichkeiten aus der DB ab
+    // Das ist die zentrale Datenlade-Methode der Komponente
     private async Task LoadAsync()
     {
         isLoading = true;
@@ -50,12 +64,13 @@ public partial class AufgabenCompact : ComponentBase
             int parsed = 0;
             if (!int.TryParse(idClaim, out parsed) || parsed <= 0)
             {
+                // Fallback: Lookup per E-Mail in der Datenbank
                 parsed = await Db.Set<Benutzer>().Where(b => b.Email == CurrentUserEmail).Select(b => b.Id).FirstOrDefaultAsync();
             }
             CurrentUserId = parsed;
             isProjektleiter = user.IsInRole("Projektleiter");
 
-            // lade kompakte Aufgabenliste für aktuellen Benutzer (ähnlich wie Aufgabenseite)
+            // Kompakte Aufgabenliste für den aktuellen Benutzer laden
             List<Aufgabe> loaded = await Db.Set<Aufgabe>()
                 .AsNoTracking()
                 .Where(a => a.BenutzerId == CurrentUserId)
@@ -64,7 +79,7 @@ public partial class AufgabenCompact : ComponentBase
 
             tasks = loaded;
 
-            // Modal Hilfsdaten
+            // Modal-Hilfsdaten: Projekte, bei denen der Benutzer Owner oder Projektleiter ist
             Projekt keinProjekt = new Projekt { Id = 0, Projektbeschreibung = "(kein Projekt)" };
             List<Projekt> relevante = await Db.Set<Projekt>()
                 .Where(p => p.BenutzerId == CurrentUserId || p.ProjektleiterId == CurrentUserId)
@@ -83,8 +98,10 @@ public partial class AufgabenCompact : ComponentBase
         }
     }
 
+    // CanEdit: einfache Berechtigungsprüfung für die UI
     protected bool CanEdit(Aufgabe a) => isProjektleiter || a.BenutzerId == CurrentUserId;
 
+    // OpenCreateModal: Bereitet das Modal-Modell für das Anlegen einer neuen Aufgabe vor
     protected void OpenCreateModal()
     {
         editModel = new Aufgabe
@@ -100,6 +117,7 @@ public partial class AufgabenCompact : ComponentBase
         isModalOpen = true;
     }
 
+    // OpenEditModal: Lädt eine einzelne Aufgabe und öffnet das Modal zum Bearbeiten
     protected async Task OpenEditModal(int id)
     {
         Aufgabe? found = await Db.Set<Aufgabe>().AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
@@ -122,11 +140,14 @@ public partial class AufgabenCompact : ComponentBase
         isModalOpen = true;
     }
 
+    // CloseModal: Schließt das Modal ohne zu speichern
     protected void CloseModal()
     {
         isModalOpen = false;
     }
 
+    // SaveAsync: Speichert das editModel in die Datenbank (Anlage oder Update)
+    // Hinweis: In der Compact-Ansicht werden Fehler bewusst nicht detailliert angezeigt
     protected async Task SaveAsync()
     {
         if (editModel.ErstellVon <= 0) editModel.ErstellVon = CurrentUserId;
@@ -143,22 +164,25 @@ public partial class AufgabenCompact : ComponentBase
         }
         catch
         {
-            // für Compact-View einfache Fehlerunterdrückung; detailierte UI-Fehleranzeige bleibt auf kompletter Aufgabenseite
+            // In der Compact-Ansicht: einfache Fehlerunterdrückung
         }
     }
 
+    // OnProjektPicked: Wird aufgerufen, wenn im Modal ein Projekt gewählt wurde
     protected async Task OnProjektPicked(Projekt? p)
     {
         editModel.ProjektId = p == null || p.Id <= 0 ? null : p.Id;
         await RefreshBearbeiterChoicesAsync(editModel.ProjektId);
     }
 
+    // OnBearbeiterSelected: Setzt den Bearbeiter, falls aktueller Benutzer Projektleiter ist
     protected void OnBearbeiterSelected(Benutzer? b)
     {
         if (!isProjektleiter || b == null) return;
         editModel.BenutzerId = b.Id;
     }
 
+    // SetBearbeiterToCurrentUser: Hilfsfunktion, um den Bearbeiter standardmäßig auf den aktuellen Nutzer zu setzen
     private void SetBearbeiterToCurrentUser()
     {
         editModel.BenutzerId = CurrentUserId;
@@ -169,6 +193,8 @@ public partial class AufgabenCompact : ComponentBase
         bearbeiterSearch = CurrentUserEmail;
     }
 
+    // RefreshBearbeiterChoicesAsync: Lädt mögliche Bearbeiter für ein Projekt.
+    // Falls der aktuelle Benutzer nicht Projektleiter ist, wird auf den aktuellen Benutzer reduziert.
     private async Task RefreshBearbeiterChoicesAsync(int? projektId)
     {
         if (!isProjektleiter || !projektId.HasValue || projektId.Value <= 0)
@@ -207,6 +233,7 @@ public partial class AufgabenCompact : ComponentBase
         bearbeiterSearch = string.Empty;
     }
 
+    // UI-Helfer: mappt Status auf CSS-Klasse
     protected string GetStatusClass(Erledigungsstatus s)
     {
         return s switch

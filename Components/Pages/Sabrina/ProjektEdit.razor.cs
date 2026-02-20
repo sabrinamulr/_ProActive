@@ -10,6 +10,10 @@ using ProActive2508.Models.Entity.Anja;
 
 namespace ProActive2508.Components.Pages.Sabrina
 {
+    // Modal-Komponente zum Bearbeiten eines Projekts.
+    // Zuständigkeiten:
+    // - Laden des Projekts und zugehöriger Hilfsdaten (Phasen, Benutzer, Mitglieder)
+    // - Validierung und Speichern (Upsert) von Projekt, Phasen und Mitgliedern in einer Transaktion
     public partial class ProjektEdit
     {
         [Parameter] public int ProjectId { get; set; }
@@ -29,14 +33,18 @@ namespace ProActive2508.Components.Pages.Sabrina
         private bool isProjektleiterRole = false;
         private int CurrentUserId;
 
-        // Mitgliederverwaltung
+        // Mitgliederverwaltung (IDs, die aktuell ausgewählt sind)
         private List<int> selectedMemberIds = new();
 
+        // OnParametersSetAsync: Lade Daten, wenn ProjectId gesetzt oder geändert wurde
         protected override async Task OnParametersSetAsync()
         {
             await LoadAsync();
         }
 
+        // LoadAsync: Lädt Projekt, User-Liste, vorhandene Projektphasen und Mitglieder
+        // - bestimmt CurrentUserId und Rolle
+        // - erstellt editPhaseSelections (falls keine Phasen vorhanden, wird eine Default-Phase gesetzt)
         private async Task LoadAsync()
         {
             isLoading = true;
@@ -85,7 +93,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                 List<ProjektBenutzer> members = await Db.ProjektBenutzer.AsNoTracking().Where(pb => pb.ProjektId == ProjectId).ToListAsync();
                 selectedMemberIds = members.Select(m => m.BenutzerId).ToList();
 
-                // phases (existing) — use correct property names: ProjekteId / PhasenId
+                // phases (existing)
                 List<ProjektPhase> existing = await Db.ProjektPhasen
                     .AsNoTracking()
                     .Where(pp => pp.ProjekteId == ProjectId)
@@ -95,6 +103,7 @@ namespace ProActive2508.Components.Pages.Sabrina
 
                 if (!existing.Any())
                 {
+                    // Falls keine Phasen angelegt sind: Default-Phase als Platzhalter
                     Phase? first = await Db.Phasen.AsNoTracking().OrderBy(p => p.Id).FirstOrDefaultAsync();
                     if (first != null)
                     {
@@ -116,6 +125,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                 }
                 else
                 {
+                    // Vorhandene Phasen in editPhaseSelections transformieren
                     editPhaseSelections = existing.Select(pp => new PhaseEditConfig
                     {
                         ExistingId = pp.Id,
@@ -140,6 +150,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             }
         }
 
+        // ToggleMember: Checkbox-Wechsel für Mitgliederliste
         private void ToggleMember(int id, bool isChecked)
         {
             if (isChecked)
@@ -152,6 +163,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             }
         }
 
+        // RemoveMember: entfernt einen Benutzer aus der Mitgliedsliste
         private void RemoveMember(int userId)
         {
             if (selectedMemberIds != null && selectedMemberIds.Contains(userId))
@@ -159,6 +171,9 @@ namespace ProActive2508.Components.Pages.Sabrina
                 selectedMemberIds.Remove(userId);
             }
         }
+
+        // SaveAsync: Speichert alle Änderungen (Projekt, Phasen, Mitglieder) atomar in einer DB-Transaktion.
+        // Enthält Validierungen und Berechtigungsprüfungen.
         private async Task SaveAsync()
         {
             if (editModel is null) return;
@@ -188,29 +203,26 @@ namespace ProActive2508.Components.Pages.Sabrina
             isSaving = true;
             try
             {
-                // Use explicit transaction to ensure atomic update of project, phases and members
                 Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction tx = await Db.Database.BeginTransactionAsync();
                 await using (tx)
                 {
-                    // Update Projekt safely: avoid duplicate tracked instances
+                    // Update Projekt sicher: tracked entity vermeiden
                     Projekt? dbProj = await Db.Projekte.FindAsync(ProjectId);
                     if (dbProj == null)
                     {
-                        // Projekt not tracked / not present -> add as new (should not normally happen for edit)
                         Db.Projekte.Add(editModel);
                         await Db.SaveChangesAsync();
-                        dbProj = editModel; // now has Id
+                        dbProj = editModel; // jetzt Id gesetzt
                     }
                     else
                     {
-                        // Apply scalar property changes to the tracked entity
                         Db.Entry(dbProj).CurrentValues.SetValues(editModel);
                         await Db.SaveChangesAsync();
                     }
 
                     int targetProjektId = dbProj.Id;
 
-                    // Upsert ProjektPhasen (use ProjekteId / PhaseId)
+                    // Upsert ProjektPhasen
                     List<ProjektPhase> existing = await Db.ProjektPhasen.Where(pp => pp.ProjekteId == targetProjektId).ToListAsync();
                     foreach (PhaseEditConfig sel in editPhaseSelections)
                     {
@@ -266,7 +278,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                         }
                     }
 
-                    // Sync ProjektBenutzer (Mitglieder) using targetProjektId
+                    // Sync ProjektBenutzer (Mitglieder)
                     List<ProjektBenutzer> existingMembers = await Db.ProjektBenutzer.Where(pb => pb.ProjektId == targetProjektId).ToListAsync();
                     List<int> existingIds = existingMembers.Select(m => m.BenutzerId).ToList();
 
@@ -291,14 +303,13 @@ namespace ProActive2508.Components.Pages.Sabrina
                     await tx.CommitAsync();
                 }
 
-                // fertig: Callback an Parent
+                // Callback an Parent
                 if (OnSaved.HasDelegate)
                 {
                     await OnSaved.InvokeAsync();
                 }
                 else
                 {
-                    // Fallback: aktualisiere Seite / navigiere zur aktuellen URI
                     Nav.NavigateTo(Nav.Uri, forceLoad: false);
                 }
             }
@@ -317,6 +328,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             if (OnCancelled.HasDelegate) await OnCancelled.InvokeAsync();
         }
 
+        // Hilfsklasse: Phase-Konfiguration im Editor
         protected class PhaseEditConfig
         {
             public int ExistingId { get; set; }

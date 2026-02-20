@@ -9,6 +9,10 @@ using ProActive2508.Models.Entity.Anja;
 
 namespace ProActive2508.Components.Pages.Sabrina
 {
+    // Seite zum Definieren / Anpassen der Phasen eines Projekts.
+    // Verantwortlich für:
+    // - Laden globaler Phasen und vorhandener projektbezogener Phasen
+    // - Erstellen / Updaten von ProjektPhasen und zugehörigen Meilensteinen
     public partial class PhasenDefinieren : ComponentBase
     {
         [Parameter] public int ProjectId { get; set; }
@@ -25,11 +29,14 @@ namespace ProActive2508.Components.Pages.Sabrina
         protected bool isSaving = false;
         protected string? uiError;
 
+        // Lifecycle: wenn Parameter gesetzt/aktualisiert werden, neu laden
         protected override async Task OnParametersSetAsync()
         {
             await LoadAsync();
         }
 
+        // LoadAsync: Lädt Projekt, globale Phasen, vorhandene ProjektPhasen und Meilenstein-Vorlagen.
+        // Baut die selections-Liste auf, die die UI anzeigt.
         private async Task LoadAsync()
         {
             isLoading = true;
@@ -40,7 +47,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                 project = await Db.Projekte.AsNoTracking().FirstOrDefaultAsync(p => p.Id == ProjectId);
                 if (project == null) return;
 
-                // feste Reihenfolge: Phasen in der DB in definierter Reihenfolge laden (Id aufsteigend)
+                // feste Reihenfolge: Phasen in DB 
                 phases = await Db.Phasen.AsNoTracking().OrderBy(p => p.Id).ToListAsync();
                 allUsers = await Db.Benutzer.AsNoTracking().OrderBy(b => b.Email).ToListAsync();
 
@@ -49,12 +56,12 @@ namespace ProActive2508.Components.Pages.Sabrina
                     .AsNoTracking()
                     .ToListAsync();
 
-                // lade alle Meilenstein‑Vorlagen (global)
+                // Meilenstein-Vorlagen laden
                 List<Meilenstein> meilensteinVorlagen = await Db.Meilensteine
                     .AsNoTracking()
                     .ToListAsync();
 
-                // Build selections: für jede globale Phase immer ein Eintrag (Reihenfolge unveränderlich)
+                // Build selections: für jede globale Phase ein Eintrag 
                 selections = new List<PhaseConfig>();
                 foreach (Phase ph in phases)
                 {
@@ -98,6 +105,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             }
         }
 
+        // SaveAsync: Validierung + Upsert der ProjektPhasen und PhaseMeilensteine.
         protected async Task SaveAsync()
         {
             if (project == null) return;
@@ -106,7 +114,7 @@ namespace ProActive2508.Components.Pages.Sabrina
 
             try
             {
-                // Validierung: Start <= Due für alle und Notizen‑Länge
+                // Validierung: Start <= Due und Notizen-Länge
                 foreach (PhaseConfig cfg in selections)
                 {
                     if (cfg.StartDate.Date > cfg.DueDate.Date)
@@ -123,10 +131,10 @@ namespace ProActive2508.Components.Pages.Sabrina
                     }
                 }
 
-                // 1) vorhandene ProjektPhasen laden (zur Upsert-Entscheidung)
+                // vorhandene ProjektPhasen laden (zur Upsert-Entscheidung)
                 List<ProjektPhase> existingProjektPhasen = await Db.ProjektPhasen.Where(pp => pp.ProjekteId == ProjectId).ToListAsync();
 
-                // 2) Upsert ProjektPhasen
+                // Upsert ProjektPhasen
                 foreach (PhaseConfig sel in selections)
                 {
                     if (sel.ExistingId != 0)
@@ -160,7 +168,7 @@ namespace ProActive2508.Components.Pages.Sabrina
 
                 await Db.SaveChangesAsync();
 
-                // 3) Nach Save: projektPhasen neu laden und projektbezogene Meilensteine
+                // Nach Save: projektPhasen neu laden und projektbezogene Meilensteine
                 List<ProjektPhase> projektPhasenNachSave = await Db.ProjektPhasen
                     .Where(pp => pp.ProjekteId == ProjectId)
                     .ToListAsync();
@@ -175,12 +183,12 @@ namespace ProActive2508.Components.Pages.Sabrina
                         .ToListAsync();
                 }
 
-                // 4) lade alle Meilenstein‑Vorlagen (global) — Vorlagen enthalten nur Bezeichnung
+                // lade alle Meilenstein‑Vorlagen (global)
                 List<Meilenstein> meilensteinVorlagen = await Db.Meilensteine
                     .AsNoTracking()
                     .ToListAsync();
 
-                // 5) Upsert PhaseMeilenstein (weist Vorlagen/Meilensteine der ProjektPhase zu)
+                // Upsert PhaseMeilenstein (weist Vorlagen/Meilensteine der ProjektPhase zu)
                 List<PhaseMeilenstein> existingPhaseMeilensteine = await Db.PhaseMeilensteine
                     .Where(pm => projektPhasenIdsNachSave.Contains(pm.ProjektphasenId))
                     .ToListAsync();
@@ -194,10 +202,8 @@ namespace ProActive2508.Components.Pages.Sabrina
                     Meilenstein? template = meilensteinVorlagen.FirstOrDefault(t => string.Equals(t.Bezeichnung?.Trim(), sel.Phase.Kurzbezeichnung?.Trim(), StringComparison.OrdinalIgnoreCase))
                         ?? meilensteinVorlagen.FirstOrDefault(t => (t.Bezeichnung ?? string.Empty).IndexOf(sel.Phase.Kurzbezeichnung ?? string.Empty, StringComparison.OrdinalIgnoreCase) >= 0);
 
-                    // Verwende nur vorhandene Template-IDs (keine Neuanlage). Fallback auf Phase.Id (Seed-Mapping erwartet Id 1-9).
                     int templateId = template?.Id ?? sel.Phase.Id;
 
-                    // Prüfe, ob die gewählte TemplateId tatsächlich in den vorhandenen Vorlagen existiert.
                     if (!meilensteinVorlagen.Any(m => m.Id == templateId))
                     {
                         uiError = $"Kein gültiges Meilenstein‑Template für Phase '{sel.Phase.Kurzbezeichnung}' vorhanden. Erlaubte Template‑IDs: {string.Join(", ", meilensteinVorlagen.Select(m => m.Id))}.";
@@ -209,7 +215,6 @@ namespace ProActive2508.Components.Pages.Sabrina
 
                     if (existingPm != null)
                     {
-                        // Update bestehender PhaseMeilenstein
                         existingPm.MeilensteinId = templateId;
                         existingPm.GenehmigerbenutzerId = sel.MeilensteinGenehmigerId;
                         existingPm.Status = sel.MeilensteinStatus;
@@ -219,7 +224,6 @@ namespace ProActive2508.Components.Pages.Sabrina
                     }
                     else
                     {
-                        // Neues PhaseMeilenstein anlegen (wird nur gültige MeilensteinId verwenden)
                         PhaseMeilenstein neuPm = new PhaseMeilenstein
                         {
                             ProjektphasenId = linkedProjektPhase.Id,
@@ -232,8 +236,6 @@ namespace ProActive2508.Components.Pages.Sabrina
                         Db.PhaseMeilensteine.Add(neuPm);
                     }
 
-                    // Optional: lege zusätzlich ein projekt‑gebundenes PhaseMeilenstein Entity an/aktualisiere es,
-                    // falls dein Modell Meilenstein sowohl als Vorlage als auch als Instanz verwendet.
                     PhaseMeilenstein? msInst = existingProjektMeilensteine.FirstOrDefault(m => m.ProjektphasenId == linkedProjektPhase.Id);
                     if (msInst != null)
                     {

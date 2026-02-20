@@ -17,8 +17,6 @@ namespace ProActive2508.Service
 
         public async Task<List<Benutzer>> GetMitarbeiterFuerProjektAsync(int projektId, bool includeSelf = true, CancellationToken ct = default)
         {
-            // NOTE: Hier fehlen in deinem Modell echte „Projekt-Teilnehmer“.
-            // Ich nehme pragmatisch Owner, Projektleiter, Auftraggeber als „Mitarbeiter“.
             var p = await _db.Projekte.AsNoTracking().FirstOrDefaultAsync(x => x.Id == projektId, ct);
             if (p is null) return new();
 

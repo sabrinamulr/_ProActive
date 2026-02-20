@@ -12,6 +12,10 @@ using System.Collections.Generic;
 
 namespace ProActive2508.Components.Pages.Sabrina
 {
+    // Seite zum Anlegen neuer Projekte.
+    // Verantwortlich für:
+    // - Eingabefelder für Projektdaten und Mitglieder
+    // - Erstellen des Projekts sowie initialer Phasen und Mitglieder in einer DB-Transaktion
     public partial class ProjekteNeu : ComponentBase
     {
         protected NewProjectModel model = new();
@@ -31,6 +35,7 @@ namespace ProActive2508.Components.Pages.Sabrina
         // Phasen (wie beim Bearbeiten)
         private List<PhaseEditConfig> editPhaseSelections = new();
 
+        // OnInitializedAsync: Benutzerdaten und Initialdaten laden
         protected override async Task OnInitializedAsync()
         {
             AuthenticationState auth = await Auth.GetAuthenticationStateAsync();
@@ -61,7 +66,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             allUsers = await Db.Benutzer.AsNoTracking().OrderBy(b => b.Email).ToListAsync();
 
             // Default-Phasen wie beim Edit: mindestens eine Phase vorbefüllen
-            var first = await Db.Phasen.AsNoTracking().OrderBy(p => p.Id).FirstOrDefaultAsync();
+            Phase? first = await Db.Phasen.AsNoTracking().OrderBy(p => p.Id).FirstOrDefaultAsync();
             if (first != null)
             {
                 editPhaseSelections = new List<PhaseEditConfig>
@@ -82,6 +87,7 @@ namespace ProActive2508.Components.Pages.Sabrina
         }
 
         // Standard-Save (Form-Submit)
+        // SaveAsync / SaveCoreAsync: Validierung und Erstellung des neuen Projekts (inkl. Phasen & Mitglieder)
         protected async Task SaveAsync()
         {
             await SaveCoreAsync(redirectToPhases: false);
@@ -105,7 +111,7 @@ namespace ProActive2508.Components.Pages.Sabrina
             }
 
             // validate phases
-            foreach (var cfg in editPhaseSelections)
+            foreach (PhaseEditConfig cfg in editPhaseSelections)
             {
                 if (cfg.StartDate.Date > cfg.DueDate.Date)
                 {
@@ -123,7 +129,7 @@ namespace ProActive2508.Components.Pages.Sabrina
 
             try
             {
-                // Lese die erste Phase aus der DB (feste, vordefinierte Reihenfolge)
+                // Lese die erste Phase aus der DB (feste Reihenfolge)
                 Phase? firstPhase = await Db.Phasen.AsNoTracking().OrderBy(p => p.Id).FirstOrDefaultAsync();
                 int phaseId = firstPhase?.Id ?? 0;
 
@@ -137,7 +143,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                     Phase = phaseId
                 };
 
-                // Use transaction to create project, phases and members atomically
+                // Transaktion: Projekt + Phasen + Mitglieder atomar anlegen
                 await using var tx = await Db.Database.BeginTransactionAsync();
 
                 Db.Projekte.Add(projekt);
@@ -148,9 +154,9 @@ namespace ProActive2508.Components.Pages.Sabrina
                 // create ProjektPhasen from editPhaseSelections
                 if (editPhaseSelections != null && editPhaseSelections.Any())
                 {
-                    foreach (var sel in editPhaseSelections)
+                    foreach (PhaseEditConfig sel in editPhaseSelections)
                     {
-                        var neu = new ProjektPhase
+                        ProjektPhase neu = new ProjektPhase
                         {
                             ProjekteId = newId,
                             PhasenId = sel.PhaseId,
@@ -168,7 +174,7 @@ namespace ProActive2508.Components.Pages.Sabrina
                 // Sync members
                 if (selectedMemberIds != null && selectedMemberIds.Any())
                 {
-                    foreach (var uid in selectedMemberIds)
+                    foreach (int uid in selectedMemberIds)
                     {
                         Db.ProjektBenutzer.Add(new ProjektBenutzer { ProjektId = newId, BenutzerId = uid });
                     }
@@ -226,9 +232,9 @@ namespace ProActive2508.Components.Pages.Sabrina
                 selectedMemberIds.Clear();
                 if (e?.Value is not null)
                 {
-                    var raw = e.Value.ToString() ?? string.Empty;
-                    var parts = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                    foreach (var p in parts)
+                    string raw = e.Value.ToString() ?? string.Empty;
+                    string[] parts = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    foreach (string p in parts)
                     {
                         if (int.TryParse(p, out int id)) selectedMemberIds.Add(id);
                     }
